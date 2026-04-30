@@ -1,4 +1,4 @@
-# 🎬 Animation to Video Converter
+# 🎬 Conversor de animacion a Video 
 
 > Convierte animaciones HTML/CSS/JS en archivos de video descargables — sin salir del navegador.
 
@@ -74,6 +74,7 @@ Los videos renderizados están disponibles de dos formas:
 ## 🛠️ Requisitos
 
 - [Node.js](https://nodejs.org/) v16 o superior
+- FFmpeg
 
 ---
 
