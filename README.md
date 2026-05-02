@@ -15,8 +15,9 @@ Permite capturar animaciones web (HTML + CSS + JS) y exportarlas como video. Ide
 ### 1. Iniciar el servidor
 
 ```bash
+instalar npx puppeteer browsers install chrome
 node server.js
-npx puppeteer browsers install chrome
+
 ```
 
 ### 2. Cargar tu proyecto
