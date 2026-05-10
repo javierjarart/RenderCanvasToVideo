@@ -1,6 +1,8 @@
 # 🎬 Conversor de animacion a Video 
 
 > Convierte animaciones HTML/CSS/JS en archivos de video descargables — sin salir del navegador.
+>
+> documentacion en progreso...
 
 ---
 
@@ -14,7 +16,8 @@ Permite capturar animaciones web (HTML + CSS + JS) y exportarlas como video.
 ### 1. Iniciar el servidor
 
 ```bash
-instalar npx puppeteer browsers install chrome
+sudo apt-get install -y ffmpeg
+npx puppeteer browsers install chrome
 node server.js
 
 ```
