@@ -6,11 +6,10 @@
 
 ## ¿Qué hace esta herramienta?
 
-Permite capturar animaciones web (HTML + CSS + JS) y exportarlas como video. Ideal para preservar, compartir o integrar animaciones generativas, motion graphics y experimentos creativos hechos en el navegador.
-
+Permite capturar animaciones web (HTML + CSS + JS) y exportarlas como video.
 ---
 
-## 🚀 Cómo usarla
+
 
 ### 1. Iniciar el servidor
 
