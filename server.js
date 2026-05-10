@@ -93,9 +93,6 @@ app.post('/api/render', async (req, res) => {
     res.json({ message: 'Render iniciado' });
 
     try {
-        // ── Puppeteer usando el Chromium que trae Electron ─────────────────
-        // En desarrollo usamos el que descarga puppeteer.
-        // En producción (Electron empaquetado), intentamos usar el ejecutable de Electron.
         let executablePath = null;
         try {
             executablePath = puppeteer.executablePath();
@@ -103,7 +100,6 @@ app.post('/api/render', async (req, res) => {
             console.warn("Puppeteer no encontró un navegador por defecto, intentando fallback...");
         }
 
-        // Fallback para Electron empaquetado
         if (!executablePath || !fs.existsSync(executablePath)) {
             if (process.env.ELECTRON_PATH) {
                 executablePath = process.env.ELECTRON_PATH;
@@ -198,9 +194,6 @@ app.post('/api/render', async (req, res) => {
     }
 });
 
-// Iniciar servidor inmediatamente (no esperar a ensureChrome).
-// ensureChrome corre en segundo plano; la primera vez en Windows
-// descargará Chromium (~150MB). Mientras tanto la UI ya carga.
 app.listen(3000, () => {
     console.log('Servidor listo en http://localhost:3000');
     ensureChrome().catch(err => {

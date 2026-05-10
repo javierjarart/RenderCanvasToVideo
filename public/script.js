@@ -20,10 +20,9 @@ if (btnChooseProjectDir) {
         if (path) {
             customProjectPath = path;
             selectedProjectDirDisplay.innerText = path;
-            projectSelect.value = ""; // Deseleccionar del dropdown
+            projectSelect.value = "";
             projectSelect.disabled = true;
 
-            // Añadir un botón para cancelar la selección externa
             if (!document.getElementById('btnCancelCustomProject')) {
                 const btnCancel = document.createElement('button');
                 btnCancel.id = 'btnCancelCustomProject';
@@ -62,7 +61,7 @@ if (btnChooseDir) {
 const btnOpenFolder = document.getElementById('btnOpenFolder');
 if (btnOpenFolder) {
     btnOpenFolder.onclick = () => {
-        const path = customOutputDir || 'renders'; // En el server real, renders es relativo a APP_ROOT
+        const path = customOutputDir || 'renders';
         window.electronAPI.openPath(path);
     };
 }
@@ -94,7 +93,6 @@ document.getElementById('renderForm').onsubmit = async (e) => {
         return;
     }
 
-    // Enviar datos
     await fetch('/api/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,7 +108,6 @@ document.getElementById('renderForm').onsubmit = async (e) => {
         })
     });
 
-    // Polling: Consultar progreso cada 1 segundo
     const interval = setInterval(async () => {
         const res = await fetch('/api/status');
         const status = await res.json();
