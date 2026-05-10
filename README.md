@@ -16,8 +16,8 @@ Permite capturar animaciones web (HTML + CSS + JS) y exportarlas como video.
 ### 1. Iniciar el servidor
 
 ```bash
-sudo apt-get install -y ffmpeg
-npx puppeteer browsers install chrome
+sudo apt-get install -y ffmpeg libnspr4 libnss3
+node node_modules/puppeteer/lib/cjs/puppeteer/node/cli.js browsers install chrome
 node server.js
 
 ```
