@@ -11,10 +11,21 @@ app.use(express.json());
 // Raíz dinámica: funciona tanto en desarrollo como empaquetado con electron-builder
 const APP_ROOT = process.env.APP_ROOT || __dirname;
 
+// Estado para ruta de proyecto externa
+let currentCustomProjectPath = null;
+
 // Servir carpetas estáticas
 app.use(express.static(path.join(APP_ROOT, 'public')));
 app.use('/proyectos', express.static(path.join(APP_ROOT, 'proyectos')));
 app.use('/renders', express.static(path.join(APP_ROOT, 'renders')));
+
+// Middleware para servir el proyecto externo dinámicamente
+app.use('/external-project', (req, res, next) => {
+    if (currentCustomProjectPath && fs.existsSync(currentCustomProjectPath)) {
+        return express.static(currentCustomProjectPath)(req, res, next);
+    }
+    res.status(404).send('Proyecto externo no configurado o no encontrado');
+});
 
 // Estado global para la barra de progreso
 let renderStatus = { state: 'idle', progress: 0, total: 0, fileUrl: null, error: null };
@@ -40,9 +51,16 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
-    const fileName = `Render_${project}_${Date.now()}.mp4`;
+
+    let projectName = project;
+    if (customProjectPath) {
+        currentCustomProjectPath = customProjectPath;
+        projectName = path.basename(customProjectPath);
+    }
+
+    const fileName = `Render_${projectName}_${Date.now()}.mp4`;
 
     const rendersDir = customOutputDir || path.join(APP_ROOT, 'renders');
     if (!fs.existsSync(rendersDir)) fs.mkdirSync(rendersDir, { recursive: true });
@@ -80,7 +98,10 @@ app.post('/api/render', async (req, res) => {
             };
         });
 
-        const projectUrl = `http://localhost:3000/proyectos/${project}/index.html`;
+        const projectUrl = customProjectPath
+            ? `http://localhost:3000/external-project/index.html`
+            : `http://localhost:3000/proyectos/${project}/index.html`;
+
         await page.goto(projectUrl, { waitUntil: 'networkidle0' });
         await page.waitForSelector('canvas', { timeout: 10000 });
 

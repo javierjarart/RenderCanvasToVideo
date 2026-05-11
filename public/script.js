@@ -1,4 +1,5 @@
 let customOutputDir = null;
+let customProjectPath = null;
 
 // Cargar proyectos al inicio
 fetch('/api/projects').then(r => r.json()).then(projects => {
@@ -7,6 +8,41 @@ fetch('/api/projects').then(r => r.json()).then(projects => {
         ? '<option value="">No hay carpetas en /proyectos</option>' 
         : projects.map(p => `<option value="${p}">${p}</option>`).join('');
 });
+
+// Manejar selección de carpeta de proyecto externa
+const btnChooseProjectDir = document.getElementById('btnChooseProjectDir');
+const selectedProjectDirDisplay = document.getElementById('selectedProjectDirDisplay');
+const projectSelect = document.getElementById('project');
+
+if (btnChooseProjectDir) {
+    btnChooseProjectDir.onclick = async () => {
+        const path = await window.electronAPI.chooseProjectDir();
+        if (path) {
+            customProjectPath = path;
+            selectedProjectDirDisplay.innerText = path;
+            projectSelect.value = ""; // Deseleccionar del dropdown
+            projectSelect.disabled = true;
+
+            // Añadir un botón para cancelar la selección externa
+            if (!document.getElementById('btnCancelCustomProject')) {
+                const btnCancel = document.createElement('button');
+                btnCancel.id = 'btnCancelCustomProject';
+                btnCancel.innerText = '✕';
+                btnCancel.type = 'button';
+                btnCancel.style.width = '30px';
+                btnCancel.style.padding = '5px';
+                btnCancel.style.marginTop = '0';
+                btnCancel.onclick = () => {
+                    customProjectPath = null;
+                    selectedProjectDirDisplay.innerText = 'O usa la carpeta /proyectos';
+                    projectSelect.disabled = false;
+                    btnCancel.remove();
+                };
+                selectedProjectDirDisplay.parentNode.appendChild(btnCancel);
+            }
+        }
+    };
+}
 
 // Manejar selección de carpeta de salida
 const btnChooseDir = document.getElementById('btnChooseDir');
@@ -48,18 +84,29 @@ document.getElementById('renderForm').onsubmit = async (e) => {
     if (btnOpenFolder) btnOpenFolder.style.display = 'none';
     progressFill.style.width = '0%';
 
+    const projectValue = document.getElementById('project').value;
+
+    if (!projectValue && !customProjectPath) {
+        alert("Por favor selecciona un proyecto o una carpeta externa.");
+        btn.disabled = false;
+        btn.innerText = "▶ Iniciar Render";
+        progressBox.style.display = 'none';
+        return;
+    }
+
     // Enviar datos
     await fetch('/api/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            project: document.getElementById('project').value,
+            project: projectValue,
             width: document.getElementById('width').value,
             height: document.getElementById('height').value,
             fps: document.getElementById('fps').value,
             duration: document.getElementById('duration').value,
             bgColor: document.getElementById('bgColor').value,
-            customOutputDir: customOutputDir
+            customOutputDir: customOutputDir,
+            customProjectPath: customProjectPath
         })
     });
 

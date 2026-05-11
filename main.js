@@ -66,6 +66,14 @@ ipcMain.handle('choose-output-dir', async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle('choose-project-dir', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Elegir carpeta del proyecto a renderizar',
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 ipcMain.handle('open-path', async (event, targetPath) => {
   if (targetPath) {
     await shell.openPath(targetPath);
