@@ -1,16 +1,31 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
 app.use(express.json());
 
+// Verificar dependencias
+try {
+    execSync('ffmpeg -version');
+    console.log('✅ FFmpeg detectado');
+} catch (e) {
+    console.error('❌ ERROR: FFmpeg no está instalado o no se encuentra en el PATH');
+    process.exit(1);
+}
+
+// Asegurar que los directorios existan
+const projectsPath = path.join(__dirname, 'proyectos');
+const rendersPath = path.join(__dirname, 'renders');
+if (!fs.existsSync(projectsPath)) fs.mkdirSync(projectsPath);
+if (!fs.existsSync(rendersPath)) fs.mkdirSync(rendersPath);
+
 // Servir carpetas estáticas
 app.use(express.static('public'));
-app.use('/proyectos', express.static(path.join(__dirname, 'proyectos')));
-app.use('/renders', express.static(path.join(__dirname, 'renders')));
+app.use('/proyectos', express.static(projectsPath));
+app.use('/renders', express.static(rendersPath));
 
 // Estado global para la barra de progreso
 let renderStatus = { state: 'idle', progress: 0, total: 0, fileUrl: null, error: null };
@@ -46,10 +61,11 @@ app.post('/api/render', async (req, res) => {
     res.json({ message: 'Render iniciado' }); // Respondemos rápido a la UI
 
     // Proceso asíncrono de renderizado
+    let browser;
     try {
-        const browser = await puppeteer.launch({ 
+        browser = await puppeteer.launch({
     headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
 }); 
         const page = await browser.newPage();
         await page.setViewport({ width: parseInt(width), height: parseInt(height) });
@@ -75,6 +91,12 @@ app.post('/api/render', async (req, res) => {
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(), 
             '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', outputPath
         ]);
+
+        ffmpeg.on('error', (err) => {
+            console.error('Error en FFmpeg:', err);
+            renderStatus.state = 'error';
+            renderStatus.error = `FFmpeg error: ${err.message}`;
+        });
 
         // Ciclo de dibujo
         for (let i = 1; i <= totalFrames; i++) {
@@ -113,16 +135,29 @@ app.post('/api/render', async (req, res) => {
 
         ffmpeg.stdin.end();
 
-        ffmpeg.on('close', async () => {
-            await browser.close();
-            renderStatus.state = 'done';
-            renderStatus.fileUrl = `/renders/${fileName}`;
+        const ffmpegClosePromise = new Promise((resolve) => {
+            ffmpeg.on('close', async (code) => {
+                if (code !== 0 && renderStatus.state !== 'error') {
+                    renderStatus.state = 'error';
+                    renderStatus.error = `FFmpeg terminó con código ${code}`;
+                } else if (renderStatus.state !== 'error') {
+                    renderStatus.state = 'done';
+                    renderStatus.fileUrl = `/renders/${fileName}`;
+                }
+                resolve();
+            });
         });
 
+        await ffmpegClosePromise;
+
     } catch (err) {
-        console.error(err);
+        console.error('Error durante el renderizado:', err);
         renderStatus.state = 'error';
         renderStatus.error = err.message;
+    } finally {
+        if (browser) {
+            await browser.close();
+        }
     }
 });
 
