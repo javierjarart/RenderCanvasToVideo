@@ -1,7 +1,9 @@
 # 🎬 Conversor de animacion a Video 
 
 > Convierte animaciones HTML/CSS/JS en archivos de video descargables
-> version ejeutable en windows en progreso...
+> 
+> version ejecutable en windows en progreso...
+> 
 > documentacion en progreso...
 
 ---
