@@ -1,16 +1,65 @@
 {
-  "name": "renderart-app",
+  "name": "rendercanvastovideo",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
+  "description": "Render canvas animations to video — standalone app",
+  "main": "main.js",
+  "author": "javierjarart",
   "license": "ISC",
-  "description": "",
+  "scripts": {
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron .",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
   "dependencies": {
     "express": "^5.2.1",
-    "puppeteer": "^24.42.0"
+    "ffmpeg-static": "^5.2.0",
+    "puppeteer": "^24.43.0"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.javierjarart.rendercanvastovideo",
+    "productName": "RenderCanvasToVideo",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "public/**/*",
+      "proyectos/**/*",
+      "node_modules/**/*",
+      "!node_modules/electron-builder/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "public",
+        "to": "../public"
+      },
+      {
+        "from": "proyectos",
+        "to": "../proyectos"
+      }
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.video"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
