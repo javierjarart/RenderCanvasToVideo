@@ -1,7 +1,7 @@
 {
   "name": "rendercanvastovideo",
   "version": "1.0.0",
-  "description": "Render canvas animations to video — standalone app",
+  "description": "RenderCanvasToVideo  — standalone app",
   "main": "main.js",
   "author": "javierjarart",
   "license": "ISC",

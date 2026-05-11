@@ -32,7 +32,7 @@ function startServer() {
 // ─── Crear la ventana principal ─────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 920,
+    width: 760,
     height: 680,
     minWidth: 760,
     minHeight: 520,
