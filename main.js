@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 
@@ -64,6 +64,12 @@ ipcMain.handle('choose-output-dir', async () => {
     title: 'Elegir carpeta para los renders',
   });
   return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle('open-path', async (event, targetPath) => {
+  if (targetPath) {
+    await shell.openPath(targetPath);
+  }
 });
 
 // ─── Ciclo de vida de la app ─────────────────────────────────────────────────

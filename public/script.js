@@ -1,3 +1,5 @@
+let customOutputDir = null;
+
 // Cargar proyectos al inicio
 fetch('/api/projects').then(r => r.json()).then(projects => {
     const select = document.getElementById('project');
@@ -5,6 +7,29 @@ fetch('/api/projects').then(r => r.json()).then(projects => {
         ? '<option value="">No hay carpetas en /proyectos</option>' 
         : projects.map(p => `<option value="${p}">${p}</option>`).join('');
 });
+
+// Manejar selección de carpeta de salida
+const btnChooseDir = document.getElementById('btnChooseDir');
+const selectedDirDisplay = document.getElementById('selectedDirDisplay');
+
+if (btnChooseDir) {
+    btnChooseDir.onclick = async () => {
+        const path = await window.electronAPI.chooseOutputDir();
+        if (path) {
+            customOutputDir = path;
+            selectedDirDisplay.innerText = path;
+        }
+    };
+}
+
+// Abrir carpeta de renders
+const btnOpenFolder = document.getElementById('btnOpenFolder');
+if (btnOpenFolder) {
+    btnOpenFolder.onclick = () => {
+        const path = customOutputDir || 'renders'; // En el server real, renders es relativo a APP_ROOT
+        window.electronAPI.openPath(path);
+    };
+}
 
 document.getElementById('renderForm').onsubmit = async (e) => {
     e.preventDefault();
@@ -14,11 +39,13 @@ document.getElementById('renderForm').onsubmit = async (e) => {
     const progressFill = document.getElementById('progressFill');
     const statusText = document.getElementById('statusText');
     const downloadLink = document.getElementById('downloadLink');
+    const btnOpenFolder = document.getElementById('btnOpenFolder');
 
     btn.disabled = true;
     btn.innerText = "⏳ Renderizando...";
     progressBox.style.display = 'block';
     downloadLink.style.display = 'none';
+    if (btnOpenFolder) btnOpenFolder.style.display = 'none';
     progressFill.style.width = '0%';
 
     // Enviar datos
@@ -31,7 +58,8 @@ document.getElementById('renderForm').onsubmit = async (e) => {
             height: document.getElementById('height').value,
             fps: document.getElementById('fps').value,
             duration: document.getElementById('duration').value,
-            bgColor: document.getElementById('bgColor').value
+            bgColor: document.getElementById('bgColor').value,
+            customOutputDir: customOutputDir
         })
     });
 
@@ -50,6 +78,7 @@ document.getElementById('renderForm').onsubmit = async (e) => {
             progressFill.style.width = `100%`;
             downloadLink.href = status.fileUrl;
             downloadLink.style.display = 'block';
+            if (btnOpenFolder) btnOpenFolder.style.display = 'block';
             btn.disabled = false;
             btn.innerText = "▶ Iniciar Nuevo Render";
         } else if (status.state === 'error') {

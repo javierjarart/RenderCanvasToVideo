@@ -6,7 +6,6 @@ const fs = require('fs');
 const ffmpegPath = require('ffmpeg-static');
 
 const app = express();
-const chromium = require('@sparticuz/chromium');
 app.use(express.json());
 
 // Raíz dinámica: funciona tanto en desarrollo como empaquetado con electron-builder
@@ -41,10 +40,11 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
     const fileName = `Render_${project}_${Date.now()}.mp4`;
-    const rendersDir = path.join(APP_ROOT, 'renders');
+
+    const rendersDir = customOutputDir || path.join(APP_ROOT, 'renders');
     if (!fs.existsSync(rendersDir)) fs.mkdirSync(rendersDir, { recursive: true });
     const outputPath = path.join(rendersDir, fileName);
 
@@ -59,7 +59,11 @@ app.post('/api/render', async (req, res) => {
 
  const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+    ],
 });
 
         const page = await browser.newPage();
