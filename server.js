@@ -53,18 +53,31 @@ app.post('/api/render', async (req, res) => {
 
     try {
         // ── Puppeteer usando el Chromium que trae Electron ─────────────────
-        // electron-builder empaqueta el ejecutable de Electron, que incluye Chromium.
-        // En desarrollo también funciona apuntando al binario de puppeteer descargado.
-        const executablePath = puppeteer.executablePath();              // desarrollo (descarga automática)
+        // En desarrollo usamos el que descarga puppeteer.
+        // En producción (Electron empaquetado), intentamos usar el ejecutable de Electron.
+        let executablePath = null;
+        try {
+            executablePath = puppeteer.executablePath();
+        } catch (e) {
+            console.warn("Puppeteer no encontró un navegador por defecto, intentando fallback...");
+        }
 
- const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
-    ],
-});
+        // Fallback para Electron empaquetado
+        if (!executablePath || !fs.existsSync(executablePath)) {
+            if (process.env.ELECTRON_PATH) {
+                executablePath = process.env.ELECTRON_PATH;
+            }
+        }
+
+        const browser = await puppeteer.launch({
+            headless: true,
+            executablePath: executablePath || undefined,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage'
+            ],
+        });
 
         const page = await browser.newPage();
         await page.setViewport({ width: parseInt(width), height: parseInt(height) });

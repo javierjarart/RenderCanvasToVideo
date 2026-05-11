@@ -14,6 +14,7 @@ function startServer() {
         APP_ROOT: app.isPackaged
             ? path.join(process.resourcesPath, '..') // carpeta donde está el .exe
             : __dirname,
+        ELECTRON_PATH: process.versions.electron ? process.execPath : null,
     },
     silent: false,
 });
