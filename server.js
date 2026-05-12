@@ -5,21 +5,57 @@ const path = require('path');
 const fs = require('fs');
 const ffmpegPath = require('ffmpeg-static');
 
+function resolveFfmpegPath() {
+    if (ffmpegPath && fs.existsSync(ffmpegPath)) return ffmpegPath;
+    const binaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+    const bundled = path.join(APP_ROOT, 'bin', binaryName);
+    if (fs.existsSync(bundled)) return bundled;
+    return 'ffmpeg';
+}
+const { install, getInstalledBrowsers, resolveBuildId, detectBrowserPlatform, Browser } = require('@puppeteer/browsers');
+
 const app = express();
 app.use(express.json());
 
-// Raíz dinámica: funciona tanto en desarrollo como empaquetado con electron-builder
 const APP_ROOT = process.env.APP_ROOT || __dirname;
+const CHROME_CACHE_DIR = process.env.CHROME_CACHE_DIR || path.join(APP_ROOT, '.cache', 'puppeteer');
 
-// Servir carpetas estáticas
+let chromeExecutablePath = null;
+
+async function ensureChrome() {
+    const installed = await getInstalledBrowsers({ cacheDir: CHROME_CACHE_DIR });
+    const chrome = installed.find(b => b.browser === Browser.CHROME);
+    if (chrome) {
+        chromeExecutablePath = chrome.executablePath;
+        return;
+    }
+    const platform = detectBrowserPlatform();
+    const buildId = await resolveBuildId(Browser.CHROME, platform, 'latest');
+    const result = await install({
+        browser: Browser.CHROME,
+        platform,
+        cacheDir: CHROME_CACHE_DIR,
+        buildId,
+        downloadProgressCallback: 'default',
+    });
+    chromeExecutablePath = result.executablePath;
+}
+
+let currentCustomProjectPath = null;
+
 app.use(express.static(path.join(APP_ROOT, 'public')));
 app.use('/proyectos', express.static(path.join(APP_ROOT, 'proyectos')));
 app.use('/renders', express.static(path.join(APP_ROOT, 'renders')));
 
-// Estado global para la barra de progreso
+app.use('/external-project', (req, res, next) => {
+    if (currentCustomProjectPath && fs.existsSync(currentCustomProjectPath)) {
+        return express.static(currentCustomProjectPath)(req, res, next);
+    }
+    res.status(404).send('Proyecto externo no configurado o no encontrado');
+});
+
 let renderStatus = { state: 'idle', progress: 0, total: 0, fileUrl: null, error: null };
 
-// API: Listar carpetas dentro de /proyectos
 app.get('/api/projects', (req, res) => {
     const projectsPath = path.join(APP_ROOT, 'proyectos');
     if (!fs.existsSync(projectsPath)) fs.mkdirSync(projectsPath, { recursive: true });
@@ -29,20 +65,25 @@ app.get('/api/projects', (req, res) => {
     res.json(directories);
 });
 
-// API: Estado del render
 app.get('/api/status', (req, res) => {
     res.json(renderStatus);
 });
 
-// API: Iniciar render
 app.post('/api/render', async (req, res) => {
     if (renderStatus.state === 'rendering') {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
-    const fileName = `Render_${project}_${Date.now()}.mp4`;
+
+    let projectName = project;
+    if (customProjectPath) {
+        currentCustomProjectPath = customProjectPath;
+        projectName = path.basename(customProjectPath);
+    }
+
+    const fileName = `Render_${projectName}_${Date.now()}.mp4`;
 
     const rendersDir = customOutputDir || path.join(APP_ROOT, 'renders');
     if (!fs.existsSync(rendersDir)) fs.mkdirSync(rendersDir, { recursive: true });
@@ -82,7 +123,6 @@ app.post('/api/render', async (req, res) => {
         const page = await browser.newPage();
         await page.setViewport({ width: parseInt(width), height: parseInt(height) });
 
-        // Control determinístico del tiempo
         await page.evaluateOnNewDocument(() => {
             window.__frameTime = 0;
             Date.now = () => window.__frameTime;
@@ -93,19 +133,24 @@ app.post('/api/render', async (req, res) => {
             };
         });
 
-        const projectUrl = `http://localhost:3000/proyectos/${project}/index.html`;
+        const projectUrl = customProjectPath
+            ? `http://localhost:3000/external-project/index.html`
+            : `http://localhost:3000/proyectos/${project}/index.html`;
+
         await page.goto(projectUrl, { waitUntil: 'networkidle0' });
         await page.waitForSelector('canvas', { timeout: 10000 });
 
-        // ── FFmpeg usando ffmpeg-static (binario incluido en el paquete) ────
-        const ffmpeg = spawn(ffmpegPath, [
+        const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
             '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', outputPath
         ]);
 
-        ffmpeg.stderr.on('data', (d) => process.stderr.write(d)); // logs de ffmpeg visibles
+        ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
 
-        // Ciclo de frames
+        ffmpeg.on('error', (err) => {
+            throw new Error(`Error al ejecutar ffmpeg: ${err.message}`);
+        });
+
         for (let i = 1; i <= totalFrames; i++) {
             const timeMs = i * (1000 / fps);
 
@@ -153,4 +198,12 @@ app.post('/api/render', async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log('✅ Servidor listo en http://localhost:3000'));
+// Iniciar servidor inmediatamente (no esperar a ensureChrome).
+// ensureChrome corre en segundo plano; la primera vez en Windows
+// descargará Chromium (~150MB). Mientras tanto la UI ya carga.
+app.listen(3000, () => {
+    console.log('Servidor listo en http://localhost:3000');
+    ensureChrome().catch(err => {
+        console.error('Error instalando Chromium:', err);
+    });
+});

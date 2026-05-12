@@ -5,3 +5,4 @@ proyectos/flowfields/index.html
 proyectos/generador-de-particulas
 node_modules
 dist/
+.cache/

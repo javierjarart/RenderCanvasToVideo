@@ -1,7 +1,9 @@
 # 🎬 Conversor de animacion a Video 
 
-> Convierte animaciones HTML/CSS/JS en archivos de video descargables — sin salir del navegador.
->
+> Convierte animaciones HTML/CSS/JS en archivos de video descargables
+> 
+> version ejecutable en windows en progreso...
+> 
 > documentacion en progreso...
 
 ---

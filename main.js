@@ -8,11 +8,17 @@ let serverProcess;
 // ─── Lanzar el servidor Express como proceso hijo ───────────────────────────
 function startServer() {
   const serverPath = path.join(__dirname, 'server.js');
+  // En empaquetado se usa el directorio de datos del usuario (escribible).
+  // En desarrollo (WSL/Linux) se usa el caché local del proyecto.
+  const chromeCacheDir = app.isPackaged
+      ? path.join(app.getPath('userData'), '.cache', 'puppeteer')
+      : path.join(__dirname, '.cache', 'puppeteer');
+
   serverProcess = fork(serverPath, [], {
     env: {
         ...process.env,
         APP_ROOT: app.isPackaged
-            ? path.join(process.resourcesPath, '..') // carpeta donde está el .exe
+            ? path.join(process.resourcesPath, '..')
             : __dirname,
         ELECTRON_PATH: process.versions.electron ? process.execPath : null,
     },
@@ -33,7 +39,7 @@ function startServer() {
 // ─── Crear la ventana principal ─────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 920,
+    width: 760,
     height: 680,
     minWidth: 760,
     minHeight: 520,
@@ -63,6 +69,14 @@ ipcMain.handle('choose-output-dir', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
     title: 'Elegir carpeta para los renders',
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle('choose-project-dir', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Elegir carpeta del proyecto a renderizar',
   });
   return result.canceled ? null : result.filePaths[0];
 });
