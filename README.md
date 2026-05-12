@@ -1,4 +1,4 @@
-# Canvas Render To Video
+# Render Canvas To Video
 
 Convierte animaciones HTML/CSS/JS en video MP4.  
 App de escritorio usando Electron.
