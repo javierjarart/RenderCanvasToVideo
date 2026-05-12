@@ -58,7 +58,9 @@
     "win": {
       "target": "nsis",
       "icon": "public/icon.ico",
-      "publisherName": "Javier Jara"
+      "signtoolOptions": {
+        "publisherName": "Javier Jara"
+      }
     },
     "linux": {
       "target": "AppImage"

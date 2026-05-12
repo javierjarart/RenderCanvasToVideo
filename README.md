@@ -1,89 +1,63 @@
-# 🎬 Conversor de animacion a Video 
+# Canvas Render To Video
 
-> Convierte animaciones HTML/CSS/JS en archivos de video descargables
-> 
-> version ejecutable en windows en progreso...
-> 
-> documentacion en progreso...
-
----
-
-## ¿Qué hace esta herramienta?
-
-Permite capturar animaciones web (HTML + CSS + JS) y exportarlas como video.
----
+Convierte animaciones HTML/CSS/JS en video MP4.  
+App de escritorio usando Electron.
 
 
+## Funcionamiento
 
-### 1. Iniciar el servidor
+Toma un `canvas` de una página web, captura cada frame y los encadena con FFmpeg para generar un video. Útil para exportar animaciones generadas con código (p5.js, Three.js, canvas API, etc.).
+
+## Requisitos
+
+- Node.js 18+
+- Windows, macOS o Linux
+
+
+## Uso rápido
 
 ```bash
-sudo apt-get install -y ffmpeg libnspr4 libnss3
-node node_modules/puppeteer/lib/cjs/puppeteer/node/cli.js browsers install chrome
-node server.js
-
+npm install
+npm start
 ```
 
-### 2. Cargar tu proyecto
+La primera ejecución descarga Chromium (~150 MB) para la captura de frames. Una vez listo, se abre la ventana de la aplicación.
 
-Copia la carpeta con tus archivos (`index.html`, `.js`, `.css`) dentro de la carpeta `proyectos/`.
 
-```
-proyectos/
-└── mi-animacion/
-    ├── index.html
-    ├── style.css
-    └── sketch.js
-```
+## Parámetros de render
 
-### 3. Abrir en el navegador
+- **Ancho / Alto**: resolución del video en píxeles
+- **FPS**: cuadros por segundo
+- **Duración**: segundos de video
+- **Color de fondo**: color para píxeles transparentes
+- **Carpeta de salida**: opcional, por defecto `renders/`
 
-```
-http://localhost:3000
-```
+## Compilar para distribución
 
-### 4. Ajustar parámetros
-
-Desde la interfaz puedes configurar:
-
-- Resolución del video
-- Duración / número de frames
-- FPS
-- Formato de salida
-
----
-
-## 📥 Obtener los videos
-
-Los videos renderizados están disponibles de dos formas:
-
-- **Descarga directa** desde la interfaz web
-- **Carpeta local** en `renders/` dentro del proyecto
-
----
-
-## 📁 Estructura del proyecto
-
-```
-.
-├── server.js          # Servidor principal
-├── proyectos/         # Aquí van tus animaciones
-│   └── mi-animacion/
-│       ├── index.html
-│       ├── style.css
-│       └── main.js
-└── renders/           # Videos exportados
+```bash
+npm run dist:win    # Windows (.exe)
+npm run dist:mac    # macOS (.dmg)
+npm run dist:linux  # Linux (.AppImage)
 ```
 
----
+El instalador se genera en `dist/`.
 
-## 🛠️ Requisitos
+## Estructura
 
-- [Node.js](https://nodejs.org/) v16 o superior
-- FFmpeg
+```
+├── main.js          # Proceso principal de Electron
+├── server.js        # Servidor Express + captura con Puppeteer
+├── preload.js       # Puente IPC para el diálogo de archivos
+├── public/          # Interfaz de usuario
+│   ├── index.html
+│   ├── style.css
+│   └── script.js
+├── proyectos/       # Animaciones fuente
+├── renders/         # Videos generados
+├── bin/             # FFmpeg para Windows (empaquetado)
+└── .cache/          # Chromium (descargado automáticamente)
+```
 
----
-
-## 📄 Licencia
+## Licencia
 
 MIT

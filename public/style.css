@@ -5,128 +5,211 @@
   --panel: #1e1e1e;
   --text: #e0e0e0;
   --accent: #ff4800;
-
-  
+  --accent-hover: #ff6600;
+  --border: #444;
+  --border-light: #333;
+  --muted: #aaa;
+  --disabled: #555;
+  --link: #03dac6;
+  --radius: 2px;
+  --radius-panel: 12px;
+  --radius-btn: 4px;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
 }
 
+* {
+  box-sizing: border-box;
+}
 
 body {
-   font-family: "Josefin Sans", sans-serif;
-/*font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;*/
+  font-family: "Josefin Sans", sans-serif;
   background: var(--bg);
   color: var(--text);
   display: flex;
   justify-content: center;
-  padding: 40px;
+  padding: 20px;
   margin: 0;
+  overflow-x: hidden;
 }
+
 .studio-container {
   background: var(--panel);
-  padding: 40px;
-  border-radius: 15px 15px / 30px;;
-  width: 700px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-  border: 1px solid #333;
+  padding: 20px;
+  border-radius: var(--radius-panel) var(--radius-panel) / 24px;
+  width: 330px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-light);
 }
+
 h1 {
   text-align: center;
   margin-top: 0;
+  margin-bottom: 15px;
   color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 2px;
-  font-size: 24px;
+  letter-spacing: 1px;
+  font-size: 18px;
 }
+
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
+
 label {
   display: block;
-  margin-bottom: 5px;
-  font-size: 14px;
+  margin-bottom: 3px;
+  font-size: 12px;
   font-weight: bold;
-  color: #aaa;
+  color: var(--muted);
 }
+
 input,
 select {
   width: 100%;
-  padding: 10px;
+  padding: 7px 8px;
   background: #0a0807;
-  border: 1px solid #444;
-  border-radius: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   color: white;
   box-sizing: border-box;
   outline: none;
   transition: border-color 0.2s;
+  font-size: 12px;
 }
+
 input:focus,
 select:focus {
   border-color: var(--accent);
 }
+
 .row {
   display: flex;
-  gap: 15px;
+  gap: 10px;
 }
+
+.flex-1 {
+  flex: 1;
+}
+
+.flex-15 {
+  flex: 1.5;
+}
+
+.flex-2 {
+  flex: 2;
+}
+
+.inline-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-row.mt-8 {
+  margin-top: 8px;
+}
+
+.inline-row.mt-10 {
+  margin-top: 10px;
+}
+
+.btn-small {
+  margin-top: 0;
+  padding: 7px 8px;
+  font-size: 11px;
+}
+
+.path-display {
+  font-size: 11px;
+  color: #777;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 button {
   width: 100%;
-  padding: 15px;
+  padding: 10px;
   background: var(--accent);
   color: #000;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--radius-btn);
+  font-size: 12px;
   font-weight: bold;
   cursor: pointer;
-  transition: 0.3s;
-  margin-top: 10px;
+  transition: 0.2s;
+  margin-top: 8px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
+
 button:hover {
-  background: #ff4800;
+  background: var(--accent-hover);
   transform: translateY(-1px);
 }
+
 button:active {
   transform: translateY(0);
 }
+
 button:disabled {
-  background: #555;
+  background: var(--disabled);
   cursor: not-allowed;
   transform: none;
 }
 
-/* Barra de progreso */
+#bgColor {
+  height: 60px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+#btnOpenFolder {
+  background: #333;
+  color: white;
+  display: none;
+}
+
+#btnOpenFolder:hover {
+  background: #555;
+  transform: translateY(-1px);
+}
+
 .progress-box {
   display: none;
-  margin-top: 25px;
+  margin-top: 15px;
   text-align: center;
 }
+
 .progress-bar {
   width: 100%;
-  background: #333;
-  border-radius: 2px;
+  background: var(--border-light);
+  border-radius: var(--radius);
   overflow: hidden;
-  height: 12px;
-  margin-top: 10px;
+  height: 8px;
+  margin-top: 6px;
 }
+
 .progress-fill {
   width: 0%;
   height: 100%;
   background: var(--accent);
   transition: width 0.3s;
 }
+
 #downloadLink {
   display: none;
-  margin-top: 15px;
   text-align: center;
-  color: #03dac6;
+  color: var(--link);
   font-weight: bold;
   text-decoration: none;
-  border: 1px solid #03dac6;
-  padding: 10px;
-  border-radius: 2px;
-  font-size: 13px;
+  border: 1px solid var(--link);
+  padding: 7px;
+  border-radius: var(--radius);
+  font-size: 11px;
   text-transform: uppercase;
 }
+
 #downloadLink:hover {
   background: rgba(3, 218, 198, 0.1);
 }
