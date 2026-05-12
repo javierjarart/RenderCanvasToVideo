@@ -8,12 +8,20 @@ let serverProcess;
 // ─── Lanzar el servidor Express como proceso hijo ───────────────────────────
 function startServer() {
   const serverPath = path.join(__dirname, 'server.js');
+  // En modo empaquetado, .cache/puppeteer queda dentro de resources/
+  // (porque se incluye via "files" en electron-builder).
+  // En desarrollo está en la raíz del proyecto.
+  const puppeteerCacheDir = app.isPackaged
+      ? path.join(process.resourcesPath, '.cache', 'puppeteer')
+      : path.join(__dirname, '.cache', 'puppeteer');
+
   serverProcess = fork(serverPath, [], {
     env: {
         ...process.env,
         APP_ROOT: app.isPackaged
-            ? path.join(process.resourcesPath, '..') // carpeta donde está el .exe
+            ? path.join(process.resourcesPath, '..')
             : __dirname,
+        PUPPETEER_CACHE_DIR: puppeteerCacheDir,
     },
     silent: false,
 });

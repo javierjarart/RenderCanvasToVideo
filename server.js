@@ -12,11 +12,12 @@ app.use(express.json());
 const APP_ROOT = process.env.APP_ROOT || __dirname;
 
 // Forzar la ruta del caché de Puppeteer explícitamente.
-// Esto evita el error "browser was not found at the configured executablePath"
-// cuando .puppeteerrc.cjs no se encuentra (porque Puppeteer lo busca desde
-// process.cwd(), que puede ser distinto al raíz del proyecto al ejecutarse via Electron).
-const CACHE_DIR = path.join(APP_ROOT, '.cache', 'puppeteer');
-process.env.PUPPETEER_CACHE_DIR = CACHE_DIR;
+// `main.js` ya pasa PUPPETEER_CACHE_DIR con la ruta correcta según
+// el modo (desarrollo vs empaquetado). Si no está (ej: node server.js directo),
+// se deduce desde APP_ROOT.
+if (!process.env.PUPPETEER_CACHE_DIR) {
+    process.env.PUPPETEER_CACHE_DIR = path.join(APP_ROOT, '.cache', 'puppeteer');
+}
 
 // Estado para ruta de proyecto externa
 let currentCustomProjectPath = null;
