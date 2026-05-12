@@ -143,8 +143,28 @@ app.post('/api/render', async (req, res) => {
 
         ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
 
+        let ffmpegError = null;
         ffmpeg.on('error', (err) => {
-            throw new Error(`Error al ejecutar ffmpeg: ${err.message}`);
+            ffmpegError = err.message;
+            console.error('Error en ffmpeg:', err.message);
+        });
+
+        ffmpeg.on('close', (code) => {
+            if (ffmpegError) {
+                renderStatus.state = 'error';
+                renderStatus.error = ffmpegError;
+                browser.close().catch(() => {});
+                return;
+            }
+            if (code !== 0) {
+                renderStatus.state = 'error';
+                renderStatus.error = `ffmpeg terminó con código ${code}`;
+                browser.close().catch(() => {});
+                return;
+            }
+            browser.close().catch(() => {});
+            renderStatus.state = 'done';
+            renderStatus.fileUrl = `/renders/${fileName}`;
         });
 
         for (let i = 1; i <= totalFrames; i++) {
@@ -180,12 +200,6 @@ app.post('/api/render', async (req, res) => {
         }
 
         ffmpeg.stdin.end();
-
-        ffmpeg.on('close', async () => {
-            await browser.close();
-            renderStatus.state = 'done';
-            renderStatus.fileUrl = `/renders/${fileName}`;
-        });
 
     } catch (err) {
         console.error(err);
