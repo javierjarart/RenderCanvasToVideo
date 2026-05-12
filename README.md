@@ -36,7 +36,7 @@ proyectos/
 
 El `index.html` debe contener un elemento `<canvas>`. La app capturará el contenido de ese canvas frame por frame.
 
-También podés seleccionar una carpeta externa desde la interfaz si preferís trabajar fuera del proyecto.
+También puedes seleccionar una carpeta externa desde la interfaz si prefieres trabajar fuera del proyecto.
 
 ## Parámetros de render
 
