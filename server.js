@@ -11,6 +11,13 @@ app.use(express.json());
 // Raíz dinámica: funciona tanto en desarrollo como empaquetado con electron-builder
 const APP_ROOT = process.env.APP_ROOT || __dirname;
 
+// Forzar la ruta del caché de Puppeteer explícitamente.
+// Esto evita el error "browser was not found at the configured executablePath"
+// cuando .puppeteerrc.cjs no se encuentra (porque Puppeteer lo busca desde
+// process.cwd(), que puede ser distinto al raíz del proyecto al ejecutarse via Electron).
+const CACHE_DIR = path.join(APP_ROOT, '.cache', 'puppeteer');
+process.env.PUPPETEER_CACHE_DIR = CACHE_DIR;
+
 // Estado para ruta de proyecto externa
 let currentCustomProjectPath = null;
 
@@ -70,30 +77,15 @@ app.post('/api/render', async (req, res) => {
     res.json({ message: 'Render iniciado' });
 
     try {
-        // ── Puppeteer usando el Chromium descargado ────────────────────────
-        // Se intenta usar la ruta por defecto (desarrollo) o una relativa a APP_ROOT (empaquetado)
-        let executablePath = puppeteer.executablePath();
-
-        // Si estamos empaquetados, APP_ROOT apunta a la carpeta de recursos.
-        // Verificamos si el ejecutable existe en la ruta de desarrollo, si no, lo buscamos en el bundle.
-        if (!fs.existsSync(executablePath)) {
-            const bundledPath = path.join(APP_ROOT, '.cache', 'puppeteer');
-            if (fs.existsSync(bundledPath)) {
-                // Forzamos a puppeteer a buscar en el cache del bundle si existe
-                process.env.PUPPETEER_CACHE_DIR = bundledPath;
-                executablePath = puppeteer.executablePath();
-            }
-        }
-
         const browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
-    ],
-});
+            executablePath: puppeteer.executablePath(),
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage'
+            ],
+        });
 
         const page = await browser.newPage();
         await page.setViewport({ width: parseInt(width), height: parseInt(height) });
