@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "RenderCanvasToVideo  — standalone app",
   "main": "main.js",
-  "author": "javierjarart",
+  "author": "Javier Jara",
   "license": "ISC",
   "scripts": {
     "start": "electron .",
@@ -34,6 +34,7 @@
       "server.js",
       "public/**/*",
       "proyectos/**/*",
+      ".cache/**/*",
       "node_modules/**/*",
       "!node_modules/electron-builder/**/*"
     ],
@@ -53,7 +54,8 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico"
+      "icon": "public/icon.ico",
+      "publisherName": "Javier Jara"
     },
     "linux": {
       "target": "AppImage"

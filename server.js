@@ -70,12 +70,22 @@ app.post('/api/render', async (req, res) => {
     res.json({ message: 'Render iniciado' });
 
     try {
-        // ── Puppeteer usando el Chromium que trae Electron ─────────────────
-        // electron-builder empaqueta el ejecutable de Electron, que incluye Chromium.
-        // En desarrollo también funciona apuntando al binario de puppeteer descargado.
-        const executablePath = puppeteer.executablePath();              // desarrollo (descarga automática)
+        // ── Puppeteer usando el Chromium descargado ────────────────────────
+        // Se intenta usar la ruta por defecto (desarrollo) o una relativa a APP_ROOT (empaquetado)
+        let executablePath = puppeteer.executablePath();
 
- const browser = await puppeteer.launch({
+        // Si estamos empaquetados, APP_ROOT apunta a la carpeta de recursos.
+        // Verificamos si el ejecutable existe en la ruta de desarrollo, si no, lo buscamos en el bundle.
+        if (!fs.existsSync(executablePath)) {
+            const bundledPath = path.join(APP_ROOT, '.cache', 'puppeteer');
+            if (fs.existsSync(bundledPath)) {
+                // Forzamos a puppeteer a buscar en el cache del bundle si existe
+                process.env.PUPPETEER_CACHE_DIR = bundledPath;
+                executablePath = puppeteer.executablePath();
+            }
+        }
+
+        const browser = await puppeteer.launch({
     executablePath,
     headless: true,
     args: [
