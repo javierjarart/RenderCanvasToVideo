@@ -45,6 +45,10 @@
       {
         "from": "proyectos",
         "to": "../proyectos"
+      },
+      {
+        "from": "bin",
+        "to": "../bin"
       }
     ],
     "mac": {

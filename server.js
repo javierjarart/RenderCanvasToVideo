@@ -4,6 +4,14 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const ffmpegPath = require('ffmpeg-static');
+
+function resolveFfmpegPath() {
+    if (ffmpegPath && fs.existsSync(ffmpegPath)) return ffmpegPath;
+    const binaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+    const bundled = path.join(APP_ROOT, 'bin', binaryName);
+    if (fs.existsSync(bundled)) return bundled;
+    return 'ffmpeg';
+}
 const { install, getInstalledBrowsers, resolveBuildId, detectBrowserPlatform, Browser } = require('@puppeteer/browsers');
 
 const app = express();
@@ -118,12 +126,16 @@ app.post('/api/render', async (req, res) => {
         await page.goto(projectUrl, { waitUntil: 'networkidle0' });
         await page.waitForSelector('canvas', { timeout: 10000 });
 
-        const ffmpeg = spawn(ffmpegPath, [
+        const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
             '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', outputPath
         ]);
 
         ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
+
+        ffmpeg.on('error', (err) => {
+            throw new Error(`Error al ejecutar ffmpeg: ${err.message}`);
+        });
 
         for (let i = 1; i <= totalFrames; i++) {
             const timeMs = i * (1000 / fps);
