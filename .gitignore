@@ -6,3 +6,6 @@ proyectos/generador-de-particulas
 node_modules
 dist/
 .cache/
+__pycache__/
+*.pyc
+rendercanvas.json

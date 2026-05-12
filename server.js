@@ -1,9 +1,10 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
-const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
+const { PassThrough } = require('stream');
 
 function resolveFfmpegPath() {
     if (ffmpegPath && fs.existsSync(ffmpegPath)) return ffmpegPath;
@@ -22,13 +23,23 @@ const CHROME_CACHE_DIR = process.env.CHROME_CACHE_DIR || path.join(APP_ROOT, '.c
 
 let chromeExecutablePath = null;
 
-async function ensureChrome() {
-    const installed = await getInstalledBrowsers({ cacheDir: CHROME_CACHE_DIR });
-    const chrome = installed.find(b => b.browser === Browser.CHROME);
-    if (chrome) {
-        chromeExecutablePath = chrome.executablePath;
-        return;
+async function findChrome() {
+    try {
+        const installed = await getInstalledBrowsers({ cacheDir: CHROME_CACHE_DIR });
+        const currentPlatform = detectBrowserPlatform();
+        const chrome = installed.find(b => b.browser === Browser.CHROME && b.platform === currentPlatform);
+        if (chrome) {
+            chromeExecutablePath = chrome.executablePath;
+            return true;
+        }
+    } catch (e) {
+        // ignore
     }
+    return false;
+}
+
+async function ensureChrome() {
+    if (await findChrome()) return;
     const platform = detectBrowserPlatform();
     const buildId = await resolveBuildId(Browser.CHROME, platform, 'latest');
     const result = await install({
@@ -93,22 +104,13 @@ app.post('/api/render', async (req, res) => {
     res.json({ message: 'Render iniciado' });
 
     try {
-        let executablePath = null;
-        try {
-            executablePath = puppeteer.executablePath();
-        } catch (e) {
-            console.warn("Puppeteer no encontró un navegador por defecto, intentando fallback...");
-        }
-
-        if (!executablePath || !fs.existsSync(executablePath)) {
-            if (process.env.ELECTRON_PATH) {
-                executablePath = process.env.ELECTRON_PATH;
-            }
+        if (!chromeExecutablePath || !fs.existsSync(chromeExecutablePath)) {
+            throw new Error('Chromium no está instalado. Espera a que termine la instalación.');
         }
 
         const browser = await puppeteer.launch({
             headless: true,
-            executablePath: executablePath || undefined,
+            executablePath: chromeExecutablePath,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -129,43 +131,35 @@ app.post('/api/render', async (req, res) => {
             };
         });
 
+        const baseUrl = `http://localhost:${PORT}`;
         const projectUrl = customProjectPath
-            ? `http://localhost:3000/external-project/index.html`
-            : `http://localhost:3000/proyectos/${project}/index.html`;
+            ? `${baseUrl}/external-project/index.html`
+            : `${baseUrl}/proyectos/${project}/index.html`;
 
         await page.goto(projectUrl, { waitUntil: 'networkidle0' });
         await page.waitForSelector('canvas', { timeout: 10000 });
 
-        const ffmpeg = spawn(resolveFfmpegPath(), [
-            '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
-            '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', outputPath
-        ]);
+        ffmpeg.setFfmpegPath(resolveFfmpegPath());
 
-        ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
+        const inputStream = new PassThrough();
 
-        let ffmpegError = null;
-        ffmpeg.on('error', (err) => {
-            ffmpegError = err.message;
-            console.error('Error en ffmpeg:', err.message);
-        });
-
-        ffmpeg.on('close', (code) => {
-            if (ffmpegError) {
+        const ffCommand = ffmpeg(inputStream)
+            .inputOptions(['-f', 'image2pipe', '-vcodec', 'png', '-r', String(fps)])
+            .videoCodec('libx264')
+            .outputOptions(['-pix_fmt', 'yuv420p', '-crf', '18', '-y'])
+            .output(outputPath)
+            .on('error', (err) => {
                 renderStatus.state = 'error';
-                renderStatus.error = ffmpegError;
+                renderStatus.error = err.message;
                 browser.close().catch(() => {});
-                return;
-            }
-            if (code !== 0) {
-                renderStatus.state = 'error';
-                renderStatus.error = `ffmpeg terminó con código ${code}`;
+            })
+            .on('end', () => {
                 browser.close().catch(() => {});
-                return;
-            }
-            browser.close().catch(() => {});
-            renderStatus.state = 'done';
-            renderStatus.fileUrl = `/renders/${fileName}`;
-        });
+                renderStatus.state = 'done';
+                renderStatus.fileUrl = `/renders/${fileName}`;
+            });
+
+        ffCommand.run();
 
         for (let i = 1; i <= totalFrames; i++) {
             const timeMs = i * (1000 / fps);
@@ -195,11 +189,11 @@ app.post('/api/render', async (req, res) => {
                 return tempCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
             }, bgColor || '#000000');
 
-            ffmpeg.stdin.write(Buffer.from(base64Data, 'base64'));
+            inputStream.write(Buffer.from(base64Data, 'base64'));
             renderStatus.progress = i;
         }
 
-        ffmpeg.stdin.end();
+        inputStream.end();
 
     } catch (err) {
         console.error(err);
@@ -208,9 +202,18 @@ app.post('/api/render', async (req, res) => {
     }
 });
 
-app.listen(3000, () => {
-    console.log('Servidor listo en http://localhost:3000');
-    ensureChrome().catch(err => {
-        console.error('Error instalando Chromium:', err);
+const PORT = process.env.PORT || 3000;
+
+async function start() {
+    if (!await findChrome()) {
+        await ensureChrome();
+    }
+    app.listen(PORT, () => {
+        console.log(`Servidor listo en http://localhost:${PORT}`);
     });
+}
+
+start().catch(err => {
+    console.error('Error iniciando servidor:', err);
+    process.exit(1);
 });

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sample Animation</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #000; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const NUM_PARTICLES = 120;
+const particles = [];
+
+class Particle {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.x = Math.random() * canvas.width;
+    this.y = Math.random() * canvas.height;
+    this.vx = (Math.random() - 0.5) * 2;
+    this.vy = (Math.random() - 0.5) * 2;
+    this.size = Math.random() * 3 + 1.5;
+    this.hue = Math.random() * 360;
+    this.speed = Math.random() * 0.6 + 0.2;
+  }
+  update(time) {
+    this.x += this.vx * this.speed;
+    this.y += this.vy * this.speed;
+    this.hue += 0.5;
+
+    if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+    if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const dx = this.x - cx;
+    const dy = this.y - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    const wave = Math.sin(time * 0.0008 + dist * 0.004) * 0.5 + 0.5;
+    this.vx += Math.cos(angle + wave) * 0.015;
+    this.vy += Math.sin(angle + wave) * 0.015;
+
+    const maxSpeed = 2.5;
+    const spd = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+    if (spd > maxSpeed) {
+      this.vx = (this.vx / spd) * maxSpeed;
+      this.vy = (this.vy / spd) * maxSpeed;
+    }
+  }
+  draw(ctx) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue}, 100%, 65%, 0.85)`;
+    ctx.fill();
+  }
+}
+
+for (let i = 0; i < NUM_PARTICLES; i++) {
+  particles.push(new Particle());
+}
+
+function drawConnections(ctx, time) {
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 110) {
+        const alpha = (1 - dist / 110) * 0.35;
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.strokeStyle = `rgba(80, 180, 255, ${alpha})`;
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function drawCenterGlow(ctx, time) {
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const pulse = Math.sin(time * 0.0012) * 25 + 35;
+
+  const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulse);
+  gradient.addColorStop(0, 'rgba(255, 120, 50, 0.35)');
+  gradient.addColorStop(0.4, 'rgba(200, 50, 150, 0.2)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(cx - pulse, cy - pulse, pulse * 2, pulse * 2);
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, ${155 + Math.sin(time * 0.0015) * 60 | 0}, 100, 0.4)`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+function drawOrbitingRings(ctx, time) {
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const rings = 3;
+
+  for (let r = 0; r < rings; r++) {
+    const radius = 70 + r * 55 + Math.sin(time * 0.0006 + r * 2) * 12;
+    const count = 18 + r * 8;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + time * 0.00025 * (r + 1);
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      const hue = (i * 15 + time * 0.015) % 360;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5 - r * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${hue}, 100%, 75%, 0.75)`;
+      ctx.fill();
+    }
+  }
+}
+
+function draw(time) {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  ctx.fillStyle = '#0a0514';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  particles.forEach(p => p.update(time));
+  drawConnections(ctx, time);
+  particles.forEach(p => p.draw(ctx));
+  drawCenterGlow(ctx, time);
+  drawOrbitingRings(ctx, time);
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

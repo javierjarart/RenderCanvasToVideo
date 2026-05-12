@@ -8,10 +8,8 @@ let serverProcess;
 // ─── Lanzar el servidor Express como proceso hijo ───────────────────────────
 function startServer() {
   const serverPath = path.join(__dirname, 'server.js');
-  // En empaquetado se usa el directorio de datos del usuario (escribible).
-  // En desarrollo (WSL/Linux) se usa el caché local del proyecto.
   const chromeCacheDir = app.isPackaged
-      ? path.join(app.getPath('userData'), '.cache', 'puppeteer')
+      ? path.join(process.resourcesPath, '..', '.cache', 'puppeteer')
       : path.join(__dirname, '.cache', 'puppeteer');
 
   serverProcess = fork(serverPath, [], {
@@ -20,6 +18,7 @@ function startServer() {
         APP_ROOT: app.isPackaged
             ? path.join(process.resourcesPath, '..')
             : __dirname,
+        CHROME_CACHE_DIR: chromeCacheDir,
         ELECTRON_PATH: process.versions.electron ? process.execPath : null,
     },
     silent: false,
