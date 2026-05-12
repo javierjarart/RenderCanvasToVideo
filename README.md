@@ -1,6 +1,8 @@
 # Canvas Render To Video
 
-Convierte animaciones HTML/CSS/JS en video MP4. App de escritorio basada en Electron.
+Convierte animaciones HTML/CSS/JS en video MP4.  
+App de escritorio usando Electron.
+
 
 ## Funcionamiento
 
@@ -11,7 +13,6 @@ Toma un `canvas` de una página web, captura cada frame y los encadena con FFmpe
 - Node.js 18+
 - Windows, macOS o Linux
 
-No necesitas instalar Chrome ni FFmpeg por separado — la app los descarga automáticamente la primera vez que se ejecuta.
 
 ## Uso rápido
 
@@ -22,21 +23,6 @@ npm start
 
 La primera ejecución descarga Chromium (~150 MB) para la captura de frames. Una vez listo, se abre la ventana de la aplicación.
 
-## Preparar un proyecto
-
-Dentro de la carpeta `proyectos/`, creá una carpeta con tu animación:
-
-```
-proyectos/
-└── mi-animacion/
-    ├── index.html
-    ├── style.css
-    └── sketch.js
-```
-
-El `index.html` debe contener un elemento `<canvas>`. La app capturará el contenido de ese canvas frame por frame.
-
-También puedes seleccionar una carpeta externa desde la interfaz si prefieres trabajar fuera del proyecto.
 
 ## Parámetros de render
 
