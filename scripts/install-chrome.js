@@ -11,9 +11,10 @@ if (fs.existsSync(chromeDir)) {
   console.log('Cleared existing Chrome installation.');
 }
 
+const puppeteerCli = path.join(root, 'node_modules', '.bin', 'puppeteer');
 const cmd = platform
-  ? `puppeteer browsers install chrome --platform ${platform}`
-  : 'puppeteer browsers install chrome';
+  ? `${puppeteerCli} browsers install chrome --platform ${platform}`
+  : `${puppeteerCli} browsers install chrome`;
 
 console.log(`Installing Chrome${platform ? ' for ' + platform : ''}...`);
 execSync(cmd, { stdio: 'inherit', cwd: root });

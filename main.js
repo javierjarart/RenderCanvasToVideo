@@ -38,10 +38,10 @@ function startServer() {
 // ─── Crear la ventana principal ─────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 580,
-    height: 520,
-    minWidth: 580,
-    minHeight: 520,
+    width: 440,
+    height: 560,
+    minWidth: 440,
+    minHeight: 560,
     title: 'RenderCanvasToVideo',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

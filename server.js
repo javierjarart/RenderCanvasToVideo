@@ -27,7 +27,10 @@ async function findChrome() {
     try {
         const installed = await getInstalledBrowsers({ cacheDir: CHROME_CACHE_DIR });
         const currentPlatform = detectBrowserPlatform();
-        const chrome = installed.find(b => b.browser === Browser.CHROME && b.platform === currentPlatform);
+        let chrome = installed.find(b => b.browser === Browser.CHROME && b.platform === currentPlatform);
+        if (!chrome) {
+            chrome = installed.find(b => b.browser === Browser.CHROME);
+        }
         if (chrome) {
             chromeExecutablePath = chrome.executablePath;
             return true;
