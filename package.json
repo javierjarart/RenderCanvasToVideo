@@ -34,7 +34,6 @@
       "server.js",
       "public/**/*",
       "proyectos/**/*",
-      ".cache/**/*",
       "node_modules/**/*",
       "!node_modules/electron-builder/**/*"
     ],
