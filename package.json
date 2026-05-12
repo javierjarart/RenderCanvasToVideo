@@ -10,7 +10,8 @@
     "dev": "NODE_ENV=development electron .",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux"
+    "dist:linux": "electron-builder --linux",
+    "postinstall": "puppeteer browsers install chrome"
   },
   "dependencies": {
     "express": "^5.2.1",
