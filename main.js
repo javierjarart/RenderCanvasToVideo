@@ -20,7 +20,7 @@ function startServer() {
         APP_ROOT: app.isPackaged
             ? path.join(process.resourcesPath, '..')
             : __dirname,
-        CHROME_CACHE_DIR: chromeCacheDir,
+        ELECTRON_PATH: process.versions.electron ? process.execPath : null,
     },
     silent: false,
 });

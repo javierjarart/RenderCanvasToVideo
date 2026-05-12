@@ -93,12 +93,26 @@ app.post('/api/render', async (req, res) => {
     res.json({ message: 'Render iniciado' });
 
     try {
-        if (!chromeExecutablePath) {
-            throw new Error('Chromium aún no está instalado. Espera a que termine la descarga.');
+        // ── Puppeteer usando el Chromium que trae Electron ─────────────────
+        // En desarrollo usamos el que descarga puppeteer.
+        // En producción (Electron empaquetado), intentamos usar el ejecutable de Electron.
+        let executablePath = null;
+        try {
+            executablePath = puppeteer.executablePath();
+        } catch (e) {
+            console.warn("Puppeteer no encontró un navegador por defecto, intentando fallback...");
         }
+
+        // Fallback para Electron empaquetado
+        if (!executablePath || !fs.existsSync(executablePath)) {
+            if (process.env.ELECTRON_PATH) {
+                executablePath = process.env.ELECTRON_PATH;
+            }
+        }
+
         const browser = await puppeteer.launch({
-            executablePath: chromeExecutablePath,
             headless: true,
+            executablePath: executablePath || undefined,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
