@@ -21,7 +21,6 @@ npm install
 npm start
 ```
 
-La primera ejecución descarga Chromium (~150 MB) para la captura de frames. Una vez listo, se abre la ventana de la aplicación.
 
 
 ## Parámetros de render
