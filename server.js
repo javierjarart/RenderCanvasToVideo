@@ -76,6 +76,7 @@ app.post('/api/render', async (req, res) => {
         const executablePath = puppeteer.executablePath();              // desarrollo (descarga automática)
 
  const browser = await puppeteer.launch({
+    executablePath,
     headless: true,
     args: [
         '--no-sandbox',
