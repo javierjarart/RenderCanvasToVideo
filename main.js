@@ -39,9 +39,9 @@ function startServer() {
 // ─── Crear la ventana principal ─────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 760,
-    height: 680,
-    minWidth: 760,
+    width: 580,
+    height: 520,
+    minWidth: 580,
     minHeight: 520,
     title: 'RenderCanvasToVideo',
     webPreferences: {
