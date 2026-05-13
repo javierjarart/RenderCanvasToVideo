@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Canvas Render To Video</title>
+    <title>Render Canvas To Video</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,13 +11,10 @@
         <h1>Render Canvas to Video</h1>
         <form id="renderForm">
             <div class="form-group">
-                <label>Proyecto</label>
-                <select id="project">
-                    <option value="">Cargando proyectos...</option>
-                </select>
+                
                 <div class="inline-row mt-8">
                     <button type="button" id="btnChooseProjectDir" class="btn-small flex-1">📁 Elegir Carpeta Externa</button>
-                    <span id="selectedProjectDirDisplay" class="path-display flex-15">O usa la carpeta /proyectos</span>
+                    <span id="selectedProjectDirDisplay" class="path-display flex-15"></span>
                 </div>
             </div>
 
@@ -52,7 +49,7 @@
                 <label>Carpeta de salida:</label>
                 <div class="inline-row">
                     <button type="button" id="btnChooseDir" class="btn-small flex-1">📁 Seleccionar</button>
-                    <span id="selectedDirDisplay" class="path-display flex-2">Por defecto: /renders</span>
+                    <span id="selectedDirDisplay" class="path-display flex-2"></span>
                 </div>
             </div>
 
