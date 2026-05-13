@@ -55,7 +55,6 @@ El instalador se genera en `dist/`.
 ├── proyectos/       # Animaciones fuente
 ├── renders/         # Videos generados
 ├── bin/             # FFmpeg para Windows (empaquetado)
-└── .cache/          # Chromium (descargado automáticamente)
 ```
 
 ## Licencia
