@@ -39,9 +39,9 @@ function startServer() {
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
-    height: 300,
+    height: 420,
     minWidth: 600,
-    minHeight: 300,
+    minHeight: 420,
     title: 'CanvasRenderToVideo',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
