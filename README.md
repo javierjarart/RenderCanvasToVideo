@@ -1,7 +1,6 @@
 # Render Canvas To Video
 
 Convierte animaciones HTML/CSS/JS en video MP4.  
-App de escritorio usando Electron.
 
 Nuevo Release Compilado para Windows Descarga aqui: https://github.com/javierjarart/RenderCanvasToVideo/releases/tag/v.0.0.2
 
