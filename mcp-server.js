@@ -132,8 +132,26 @@ app.post('/api/render', async (req, res) => {
             ? `http://localhost:${PORT}/external-project/index.html`
             : `http://localhost:${PORT}/proyectos/${project}/index.html`;
 
-        await page.goto(projectUrl, { waitUntil: 'networkidle0' });
-        await page.waitForSelector('canvas', { timeout: 10000 });
+        let pageLoaded = false;
+        try {
+            const gotoPromise = page.goto(projectUrl, { waitUntil: 'load', timeout: 20000 });
+            const canvasPromise = page.waitForSelector('canvas', { timeout: 30000 });
+            await Promise.race([gotoPromise, canvasPromise]);
+            pageLoaded = true;
+        } catch (e) {
+            process.stderr.write(`page.goto falló, intentando setContent: ${e.message}\n`);
+        }
+
+        if (!pageLoaded) {
+            const htmlPath = customProjectPath
+                ? path.join(customProjectPath, 'index.html')
+                : path.join(APP_ROOT, 'proyectos', project, 'index.html');
+            if (!fs.existsSync(htmlPath)) {
+                throw new Error(`No se encontró index.html en: ${htmlPath}`);
+            }
+            const html = fs.readFileSync(htmlPath, 'utf-8');
+            await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        }
 
         const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
@@ -376,8 +394,26 @@ async function renderLoop(params) {
             ? `http://localhost:${PORT}/external-project/index.html`
             : `http://localhost:${PORT}/proyectos/${project}/index.html`;
 
-        await page.goto(projectUrl, { waitUntil: 'networkidle0' });
-        await page.waitForSelector('canvas', { timeout: 10000 });
+        let pageLoaded = false;
+        try {
+            const gotoPromise = page.goto(projectUrl, { waitUntil: 'load', timeout: 20000 });
+            const canvasPromise = page.waitForSelector('canvas', { timeout: 30000 });
+            await Promise.race([gotoPromise, canvasPromise]);
+            pageLoaded = true;
+        } catch (e) {
+            process.stderr.write(`page.goto falló, intentando setContent: ${e.message}\n`);
+        }
+
+        if (!pageLoaded) {
+            const htmlPath = customProjectPath
+                ? path.join(customProjectPath, 'index.html')
+                : path.join(APP_ROOT, 'proyectos', project, 'index.html');
+            if (!fs.existsSync(htmlPath)) {
+                throw new Error(`No se encontró index.html en: ${htmlPath}`);
+            }
+            const html = fs.readFileSync(htmlPath, 'utf-8');
+            await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        }
 
         const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),

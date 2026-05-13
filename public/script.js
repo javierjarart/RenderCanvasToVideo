@@ -77,25 +77,25 @@ document.getElementById('renderForm').onsubmit = async (e) => {
     const downloadLink = document.getElementById('downloadLink');
     const btnOpenFolder = document.getElementById('btnOpenFolder');
 
+    // ─── Validación ─────────────────────────────────────────────────────────
+    const projectSelect = document.getElementById('project');
+    const projectValue = projectSelect ? projectSelect.value : '';
+
+    if (!projectValue && !customProjectPath) {
+        alert("Por favor selecciona un proyecto o una carpeta externa.");
+        return;
+    }
+
     btn.disabled = true;
     btn.innerText = "⏳ Renderizando...";
     progressBox.style.display = 'block';
     downloadLink.style.display = 'none';
     if (btnOpenFolder) btnOpenFolder.style.display = 'none';
     progressFill.style.width = '0%';
-
-    const projectValue = document.getElementById('project').value;
-
-    if (!projectValue && !customProjectPath) {
-        alert("Por favor selecciona un proyecto o una carpeta externa.");
-        btn.disabled = false;
-        btn.innerText = "▶ Iniciar Render";
-        progressBox.style.display = 'none';
-        return;
-    }
+    statusText.innerText = 'Iniciando render...';
 
     try {
-        await fetch('/api/render', {
+        const res = await fetch('/api/render', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -109,6 +109,13 @@ document.getElementById('renderForm').onsubmit = async (e) => {
                 customProjectPath: customProjectPath
             })
         });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+
+        statusText.innerText = 'Render en progreso...';
     } catch (err) {
         statusText.innerText = `❌ Error: ${err.message}`;
         btn.disabled = false;
@@ -143,7 +150,14 @@ document.getElementById('renderForm').onsubmit = async (e) => {
             }
         } catch (err) {
             clearInterval(interval);
-            statusText.innerText = `❌ Error de conexión con el servidor`;
+            // Verificar si el servidor sigue vivo
+            fetch('/api/health').then(r => r.json()).catch(() => {}).then(alive => {
+                if (!alive || !alive.ok) {
+                    statusText.innerText = `❌ El servidor dejó de responder`;
+                } else {
+                    statusText.innerText = `❌ Error de conexión con el servidor`;
+                }
+            });
             btn.disabled = false;
             btn.innerText = "▶ Reintentar";
         }

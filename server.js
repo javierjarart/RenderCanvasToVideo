@@ -57,13 +57,19 @@ let currentCustomProjectPath = null;
 
 // ─── Buffer de logs ─────────────────────────────────────────────────────────
 const logBuffer = [];
-const MAX_LOG_LINES = 500;
+const MAX_LOG_LINES = 2000;
 
 function captureLog(level, args) {
     const timestamp = new Date().toLocaleTimeString();
-    const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    const message = args.map(a => typeof a === 'object' ? (a instanceof Error ? a.stack || a.message : JSON.stringify(a, null, 2)) : String(a)).join(' ');
     logBuffer.push({ timestamp, level, message });
     if (logBuffer.length > MAX_LOG_LINES) logBuffer.splice(0, logBuffer.length - MAX_LOG_LINES);
+}
+
+function log(level, ...args) {
+    captureLog(level, args);
+    const fn = level === 'error' ? origError : level === 'warn' ? origWarn : origLog;
+    fn.apply(console, args);
 }
 
 const origLog = console.log;
@@ -79,13 +85,22 @@ app.use('/proyectos', express.static(path.join(APP_ROOT, 'proyectos')));
 app.use('/renders', express.static(path.join(APP_ROOT, 'renders')));
 
 app.use('/external-project', (req, res, next) => {
-    if (currentCustomProjectPath && fs.existsSync(currentCustomProjectPath)) {
+    if (currentCustomProjectPath) {
+        log('log', `[external-project] Sirviendo desde: ${currentCustomProjectPath}`);
+        if (!fs.existsSync(currentCustomProjectPath)) {
+            log('error', `[external-project] Ruta no existe: ${currentCustomProjectPath}`);
+            return res.status(404).send(`Ruta no encontrada: ${currentCustomProjectPath}`);
+        }
         return express.static(currentCustomProjectPath)(req, res, next);
     }
     res.status(404).send('Proyecto externo no configurado o no encontrado');
 });
 
 let renderStatus = { state: 'idle', progress: 0, total: 0, fileUrl: null, error: null };
+
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true });
+});
 
 app.get('/api/projects', (req, res) => {
     const projectsPath = path.join(APP_ROOT, 'proyectos');
@@ -129,10 +144,33 @@ app.post('/api/render', async (req, res) => {
     renderStatus = { state: 'rendering', progress: 0, total: totalFrames, fileUrl: null, error: null };
     res.json({ message: 'Render iniciado' });
 
+    log('log', `═══ Render iniciado ═══`);
+    log('log', `Proyecto: ${projectName}`);
+    log('log', `Resolución: ${width}x${height}, FPS: ${fps}, Duración: ${duration}s, Total cuadros: ${totalFrames}`);
+    log('log', `Color fondo: ${bgColor}`);
+    log('log', `Salida: ${outputPath}`);
+
     try {
+        const timeoutMs = Math.max(300000, totalFrames * 1000); // min 5min, aprox 1s per frame
+        const result = await Promise.race([
+            renderJob(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error(`Render timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+            )
+        ]);
+        return result;
+    } catch (err) {
+        log('error', `Error en render:`, err);
+        renderStatus.state = 'error';
+        renderStatus.error = err.message;
+    }
+
+    async function renderJob() {
         if (!chromeExecutablePath || !fs.existsSync(chromeExecutablePath)) {
             throw new Error('Chromium no está instalado. Espera a que termine la instalación.');
         }
+
+        log('log', `Lanzando Chromium desde: ${chromeExecutablePath}`);
 
         const browser = await puppeteer.launch({
             headless: true,
@@ -143,6 +181,8 @@ app.post('/api/render', async (req, res) => {
                 '--disable-dev-shm-usage'
             ],
         });
+
+        log('log', 'Chromium lanzado correctamente.');
 
         const page = await browser.newPage();
         await page.setViewport({ width: parseInt(width), height: parseInt(height) });
@@ -162,10 +202,60 @@ app.post('/api/render', async (req, res) => {
             ? `${baseUrl}/external-project/index.html`
             : `${baseUrl}/proyectos/${project}/index.html`;
 
-        await page.goto(projectUrl, { waitUntil: 'networkidle0' });
-        await page.waitForSelector('canvas', { timeout: 10000 });
+        log('log', `Cargando página: ${projectUrl}`);
 
-        ffmpeg.setFfmpegPath(resolveFfmpegPath());
+        page.on('pageerror', err => log('error', `Error en página: ${err.message}`));
+        page.on('console', msg => {
+            if (msg.type() === 'error') log('error', `[Consola] ${msg.text()}`);
+        });
+        page.on('requestfailed', req => log('warn', `Recurso no cargado: ${req.url()} (${req.failure()?.errorText})`));
+        page.on('dialog', dialog => dialog.dismiss().catch(() => {}));
+
+        let pageLoaded = false;
+        try {
+            const gotoPromise = page.goto(projectUrl, { waitUntil: 'load', timeout: 20000 });
+            const canvasPromise = page.waitForSelector('canvas', { timeout: 30000 });
+            await Promise.race([gotoPromise, canvasPromise]);
+            pageLoaded = true;
+        } catch (e) {
+            log('warn', `page.goto falló, intentando setContent: ${e.message}`);
+        }
+
+        if (!pageLoaded) {
+            const htmlPath = customProjectPath
+                ? path.join(customProjectPath, 'index.html')
+                : path.join(APP_ROOT, 'proyectos', project, 'index.html');
+
+            log('log', `Leyendo HTML desde: ${htmlPath}`);
+
+            if (!fs.existsSync(htmlPath)) {
+                throw new Error(`No se encontró index.html en: ${htmlPath}`);
+            }
+
+            const html = fs.readFileSync(htmlPath, 'utf-8');
+            await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        }
+
+        log('log', 'Buscando <canvas>...');
+
+        const canvasFound = await page.evaluate(() => !!document.querySelector('canvas'));
+        if (!canvasFound) {
+            const title = await page.evaluate(() => document.title);
+            const bodyPreview = await page.evaluate(() => document.body?.innerText?.slice(0, 300) || '(sin contenido)');
+            throw new Error(`No se encontró <canvas> en la página.\nTítulo: ${title}\nBody: ${bodyPreview}`);
+        }
+
+        log('log', 'Canvas encontrado.');
+
+        const canvasSize = await page.evaluate(() => {
+            const c = document.querySelector('canvas');
+            return { width: c.width, height: c.height };
+        });
+        log('log', `Canvas encontrado: ${canvasSize.width}x${canvasSize.height}`);
+
+        const ffmpegPath = resolveFfmpegPath();
+        ffmpeg.setFfmpegPath(ffmpegPath);
+        log('log', `FFmpeg: ${ffmpegPath}`);
 
         const inputStream = new PassThrough();
 
@@ -174,18 +264,28 @@ app.post('/api/render', async (req, res) => {
             .videoCodec('libx264')
             .outputOptions(['-pix_fmt', 'yuv420p', '-crf', '18', '-y'])
             .output(outputPath)
+            .on('start', (cmd) => {
+                log('log', `FFmpeg iniciado: ${cmd}`);
+            })
+            .on('progress', (info) => {
+                log('log', `FFmpeg: ${JSON.stringify(info)}`);
+            })
             .on('error', (err) => {
+                log('error', `FFmpeg error: ${err.message}`);
                 renderStatus.state = 'error';
                 renderStatus.error = err.message;
                 browser.close().catch(() => {});
             })
             .on('end', () => {
+                log('log', 'FFmpeg finalizado correctamente.');
                 browser.close().catch(() => {});
                 renderStatus.state = 'done';
                 renderStatus.fileUrl = `/renders/${fileName}`;
             });
 
         ffCommand.run();
+
+        log('log', 'Iniciando captura de cuadros...');
 
         for (let i = 1; i <= totalFrames; i++) {
             const timeMs = i * (1000 / fps);
@@ -217,29 +317,36 @@ app.post('/api/render', async (req, res) => {
 
             inputStream.write(Buffer.from(base64Data, 'base64'));
             renderStatus.progress = i;
+
+            if (i % Math.max(1, Math.floor(totalFrames / 10)) === 0 || i === totalFrames) {
+                const pct = Math.round((i / totalFrames) * 100);
+                log('log', `Cuadro ${i}/${totalFrames} (${pct}%)`);
+            }
         }
 
-        inputStream.end();
+        log('log', `Captura completada: ${totalFrames} cuadros enviados a FFmpeg.`);
 
-    } catch (err) {
-        console.error(err);
-        renderStatus.state = 'error';
-        renderStatus.error = err.message;
+        inputStream.end();
     }
 });
 
 const PORT = process.env.PORT || 3000;
 
 async function start() {
+    log('log', 'Buscando Chromium instalado...');
     if (!await findChrome()) {
+        log('log', 'Chromium no encontrado. Descargando...');
         await ensureChrome();
+        log('log', `Chromium descargado en: ${chromeExecutablePath}`);
+    } else {
+        log('log', `Chromium encontrado en: ${chromeExecutablePath}`);
     }
     app.listen(PORT, () => {
-        console.log(`Servidor listo en http://localhost:${PORT}`);
+        log('log', `Servidor listo en http://localhost:${PORT}`);
     });
 }
 
 start().catch(err => {
-    console.error('Error iniciando servidor:', err);
+    log('error', 'Error iniciando servidor:', err);
     process.exit(1);
 });
