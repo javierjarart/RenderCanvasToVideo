@@ -11,10 +11,13 @@
         <h1>Render Canvas to Video</h1>
         <form id="renderForm">
             <div class="form-group">
-                
-                <div class="inline-row mt-8">
-                    <button type="button" id="btnChooseProjectDir" class="btn-small flex-1">📁 Elegir Carpeta Externa</button>
-                    <span id="selectedProjectDirDisplay" class="path-display flex-15"></span>
+                <div class="row">
+                    <button type="button" id="btnChooseProjectDir" class="btn-small flex-1">📁Carpeta de Entrada</button>
+                    <button type="button" id="btnChooseDir" class="btn-small flex-1">📁 Carpeta de Salida</button>
+                </div>
+                <div class="row mt-4">
+                    <span id="selectedProjectDirDisplay" class="path-display"></span>
+                    <span id="selectedDirDisplay" class="path-display"></span>
                 </div>
             </div>
 
@@ -43,14 +46,6 @@
             <div class="form-group">
                 <label>Color de fondo (para píxeles transparentes)</label>
                 <input type="color" id="bgColor" value="#000000">
-            </div>
-
-            <div class="form-group">
-                <label>Carpeta de salida:</label>
-                <div class="inline-row">
-                    <button type="button" id="btnChooseDir" class="btn-small flex-1">📁 Seleccionar</button>
-                    <span id="selectedDirDisplay" class="path-display flex-2"></span>
-                </div>
             </div>
 
             <button type="submit" id="btnRender">▶ Iniciar Render</button>
