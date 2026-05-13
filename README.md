@@ -2,7 +2,7 @@
 
 Convierte animaciones HTML/CSS/JS en video MP4.  
 
-Nuevo Release Compilado para Windows Descarga aqui: https://github.com/javierjarart/RenderCanvasToVideo/releases/tag/v.0.0.2
+Nuevo Release Compilado para Windows Descarga aqui: https://github.com/javierjarart/RenderCanvasToVideo/releases/download/v.0.0.3/RenderCanvasToVideo.Setup.0.0.3.exe
 
 ## Funcionamiento
 
