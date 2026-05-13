@@ -7,11 +7,12 @@ const ffmpegPath = require('ffmpeg-static');
 const { PassThrough } = require('stream');
 
 function resolveFfmpegPath() {
-    if (ffmpegPath && fs.existsSync(ffmpegPath)) return ffmpegPath;
-    const binaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+    const isWin = process.platform === 'win32';
+    const binaryName = isWin ? 'ffmpeg.exe' : 'ffmpeg';
     const bundled = path.join(APP_ROOT, 'bin', binaryName);
     if (fs.existsSync(bundled)) return bundled;
-    return 'ffmpeg';
+    if (ffmpegPath && fs.existsSync(ffmpegPath)) return ffmpegPath;
+    return binaryName;
 }
 const { install, getInstalledBrowsers, resolveBuildId, detectBrowserPlatform, Browser } = require('@puppeteer/browsers');
 
@@ -27,10 +28,7 @@ async function findChrome() {
     try {
         const installed = await getInstalledBrowsers({ cacheDir: CHROME_CACHE_DIR });
         const currentPlatform = detectBrowserPlatform();
-        let chrome = installed.find(b => b.browser === Browser.CHROME && b.platform === currentPlatform);
-        if (!chrome) {
-            chrome = installed.find(b => b.browser === Browser.CHROME);
-        }
+        const chrome = installed.find(b => b.browser === Browser.CHROME && b.platform === currentPlatform);
         if (chrome) {
             chromeExecutablePath = chrome.executablePath;
             return true;
