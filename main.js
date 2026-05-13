@@ -42,7 +42,7 @@ function createWindow() {
     height: 560,
     minWidth: 440,
     minHeight: 560,
-    title: 'RenderCanvasToVideo',
+    title: 'CanvasRenderToVideo',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

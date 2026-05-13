@@ -131,3 +131,54 @@ button:disabled { background: var(--disabled); cursor: not-allowed; transform: n
   border-radius: var(--radius); font-size: 10px; text-transform: uppercase;
 }
 #downloadLink:hover { background: rgba(3, 218, 198, 0.1); }
+
+/* ─── Log de ejecución ──────────────────────────────────────────────────── */
+#logContainer {
+    margin-top: 8px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+#logHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    background: #151515;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: bold;
+    color: var(--muted);
+    user-select: none;
+}
+
+#logHeader:hover { background: #1a1a1a; }
+
+#logBody {
+    max-height: 160px;
+    overflow-y: auto;
+    background: #0d0d0d;
+    display: none;
+}
+
+#logBody.open { display: block; }
+
+#logContent {
+    padding: 4px 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    line-height: 1.5;
+    color: #ccc;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.log-entry { padding: 1px 0; }
+.log-entry.log-warn  { color: #ffaa00; }
+.log-entry.log-error { color: #ff4444; }
+.log-entry .log-time { color: #666; margin-right: 4px; }
+
+#logBody::-webkit-scrollbar { width: 4px; }
+#logBody::-webkit-scrollbar-track { background: #111; }
+#logBody::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }

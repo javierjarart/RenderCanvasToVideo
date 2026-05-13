@@ -57,6 +57,25 @@ async function ensureChrome() {
 
 let currentCustomProjectPath = null;
 
+// ─── Buffer de logs ─────────────────────────────────────────────────────────
+const logBuffer = [];
+const MAX_LOG_LINES = 500;
+
+function captureLog(level, args) {
+    const timestamp = new Date().toLocaleTimeString();
+    const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    logBuffer.push({ timestamp, level, message });
+    if (logBuffer.length > MAX_LOG_LINES) logBuffer.splice(0, logBuffer.length - MAX_LOG_LINES);
+}
+
+const origLog = console.log;
+const origWarn = console.warn;
+const origError = console.error;
+
+console.log = (...args) => { captureLog('log', args); origLog.apply(console, args); };
+console.warn = (...args) => { captureLog('warn', args); origWarn.apply(console, args); };
+console.error = (...args) => { captureLog('error', args); origError.apply(console, args); };
+
 app.use(express.static(path.join(APP_ROOT, 'public')));
 app.use('/proyectos', express.static(path.join(APP_ROOT, 'proyectos')));
 app.use('/renders', express.static(path.join(APP_ROOT, 'renders')));
@@ -81,6 +100,12 @@ app.get('/api/projects', (req, res) => {
 
 app.get('/api/status', (req, res) => {
     res.json(renderStatus);
+});
+
+app.get('/api/logs', (req, res) => {
+    const since = parseInt(req.query.since) || 0;
+    const newLogs = logBuffer.slice(since);
+    res.json({ logs: newLogs, total: logBuffer.length });
 });
 
 app.post('/api/render', async (req, res) => {

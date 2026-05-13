@@ -8,10 +8,10 @@
 <body>
 
     <div class="studio-container">
-        <h1>Canvas Render to Video</h1>
+        <h1>Render Canvas to Video</h1>
         <form id="renderForm">
             <div class="form-group">
-                <label>Seleccionar Proyecto:</label>
+                <label>Proyecto</label>
                 <select id="project">
                     <option value="">Cargando proyectos...</option>
                 </select>
@@ -67,6 +67,16 @@
             <div class="inline-row mt-10">
                 <a id="downloadLink" href="#" download class="flex-1">⬇ Guardar Como</a>
                 <button id="btnOpenFolder" class="flex-1">📂 Abrir Carpeta</button>
+            </div>
+        </div>
+
+        <div id="logContainer">
+            <div id="logHeader" onclick="toggleLog()">
+                <span>📋 Log de ejecución</span>
+                <span id="logToggle">▼</span>
+            </div>
+            <div id="logBody">
+                <div id="logContent"></div>
             </div>
         </div>
     </div>
