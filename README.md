@@ -86,7 +86,7 @@ Documentación completa en [`docs/mcp-server.md`](docs/mcp-server.md).
 | `hap-q-4k` | 3840×2160 | 30 | HAP_Q | .mov |
 | `hap-alpha-hd` | 1920×1080 | 60 | HAP_Alpha | .mov |
 
-### CineForm (formato MOV — intermediario profesional)
+### CineForm (formato MOV)
 
 | Preset | Resolución | FPS | Codec | Calidad | Contenedor |
 |--------|-----------|-----|-------|---------|------------|
