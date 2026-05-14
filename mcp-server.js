@@ -76,8 +76,13 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
+
+    const vCodec = codec || 'libx264';
+    const vContainer = container || '.mp4';
+    const vPixFmt = pixFmt || 'yuv420p';
+    const vCodecParams = codecParams || {};
 
     let projectName = project;
     if (customProjectPath) {
@@ -85,7 +90,7 @@ app.post('/api/render', async (req, res) => {
         projectName = path.basename(customProjectPath);
     }
 
-    const fileName = `Render_${projectName}_${Date.now()}.mp4`;
+    const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
 
     const rendersDir = customOutputDir || path.join(APP_ROOT, 'renders');
     if (!fs.existsSync(rendersDir)) fs.mkdirSync(rendersDir, { recursive: true });
@@ -154,9 +159,17 @@ app.post('/api/render', async (req, res) => {
             await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
         }
 
+        const codecArgs = ['-c:v', vCodec, '-pix_fmt', vPixFmt];
+        if (vCodec === 'libx264') {
+            codecArgs.push('-crf', String(crf || 18));
+        }
+        for (const [key, val] of Object.entries(vCodecParams)) {
+            codecArgs.push(`-${key}`, String(val));
+        }
+
         const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
-            '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', outputPath
+            '-i', '-', ...codecArgs, outputPath
         ]);
 
         ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
@@ -274,6 +287,11 @@ async function main() {
             bgColor: z.string().optional().describe('Background color for transparent pixels (hex, e.g. #000000)'),
             customOutputDir: z.string().optional().describe('Custom output directory for the rendered video'),
             customProjectPath: z.string().optional().describe('Path to an external project folder containing index.html with a canvas'),
+            codec: z.string().optional().describe('Video codec (libx264, hap, cfhd)'),
+            container: z.string().optional().describe('Container extension (.mp4, .mov)'),
+            pixFmt: z.string().optional().describe('Pixel format (yuv420p, yuv422p)'),
+            codecParams: z.record(z.string()).optional().describe('Codec-specific parameters (e.g. {"format":"hap_q"})'),
+            crf: z.number().optional().describe('CRF quality for libx264 (0-51, lower=better)'),
         },
         async (args) => {
             if (renderStatus.state === 'rendering') {
@@ -283,8 +301,13 @@ async function main() {
                 };
             }
 
-            const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath } = args;
+            const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams } = args;
             const totalFrames = parseInt(fps) * parseInt(duration);
+
+            const vCodec = codec || 'libx264';
+            const vContainer = container || '.mp4';
+            const vPixFmt = pixFmt || 'yuv420p';
+            const vCodecParams = codecParams || {};
 
             let projectName = project;
             if (customProjectPath) {
@@ -292,7 +315,7 @@ async function main() {
                 projectName = path.basename(customProjectPath);
             }
 
-            const fileName = `Render_${projectName}_${Date.now()}.mp4`;
+            const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
 
             const rendersDir = customOutputDir || path.join(APP_ROOT, 'renders');
             if (!fs.existsSync(rendersDir)) fs.mkdirSync(rendersDir, { recursive: true });
@@ -303,9 +326,10 @@ async function main() {
             process.stderr.write(`Starting render: ${fileName}\n`);
 
             renderLoop({
-                project, width, height, fps, duration, bgColor,
+                project, width, height, fps, duration, bgColor, crf: args.crf,
                 customOutputDir, customProjectPath, totalFrames,
-                projectName, fileName, outputPath
+                projectName, fileName, outputPath,
+                codec: vCodec, container: vContainer, pixFmt: vPixFmt, codecParams: vCodecParams
             }).catch(err => {
                 process.stderr.write(err.stack + '\n');
                 renderStatus.state = 'error';
@@ -640,7 +664,7 @@ function walkDir(dir, files, prefix) {
 }
 
 async function renderLoop(params) {
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, totalFrames, fileName, outputPath } = params;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, totalFrames, fileName, outputPath, codec, container, pixFmt, codecParams, crf } = params;
 
     try {
         let executablePath = null;
@@ -702,9 +726,17 @@ async function renderLoop(params) {
             await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
         }
 
+        const codecArgs2 = ['-c:v', codec || 'libx264', '-pix_fmt', pixFmt || 'yuv420p'];
+        if ((codec || 'libx264') === 'libx264') {
+            codecArgs2.push('-crf', String(crf || 18));
+        }
+        for (const [key, val] of Object.entries(codecParams || {})) {
+            codecArgs2.push(`-${key}`, String(val));
+        }
+
         const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
-            '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', outputPath
+            '-i', '-', ...codecArgs2, outputPath
         ]);
 
         ffmpeg.stderr.on('data', (d) => process.stderr.write(d));

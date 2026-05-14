@@ -62,7 +62,11 @@ class Renderer:
         height = int(cfg.get("height", 1080))
         project_name = custom_path and os.path.basename(custom_path) or cfg.get("project", "unknown")
         timestamp = int(time.time())
-        filename = f"Render_{project_name}_{timestamp}.mp4"
+        codec = cfg.get("codec", "libx264")
+        container = cfg.get("container", ".mp4")
+        pix_fmt = cfg.get("pix_fmt", "yuv420p")
+        codec_params = cfg.get("codec_params", {})
+        filename = f"Render_{project_name}_{timestamp}{container}"
         output_dir = cfg.get("output_dir", "") or os.path.join(self.base_dir, "renders")
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, filename)
@@ -79,15 +83,23 @@ class Renderer:
             "bg_color": cfg.get("bg_color", "#000000"),
             "output_dir": output_dir,
             "crf": int(cfg.get("crf", 18)),
+            "codec": codec,
+            "container": container,
+            "pix_fmt": pix_fmt,
+            "codec_params": codec_params,
             "preset": cfg.get("ffmpeg_preset", cfg.get("preset", "medium")),
         }
 
         project_name_display = custom_path and os.path.basename(custom_path) or project
+        params_str = " ".join(f"{k}={v}" for k, v in codec_params.items()) if codec_params else ""
+        codec_info = f"{codec}  {pix_fmt}  CRF={capture_cfg['crf']}" if codec == "libx264" else f"{codec}  {pix_fmt}"
+        if params_str:
+            codec_info += f"  {params_str}"
         print(f"  Project:   {project_name_display}")
         print(f"  Resolution: {width}x{height}")
         print(f"  Frames:    {total_frames} ({fps} fps x {duration}s)")
         print(f"  Output:    {output_path}")
-        print(f"  Codec:     libx264  CRF={capture_cfg['crf']}  preset={capture_cfg['preset']}")
+        print(f"  Codec:     {codec_info}  preset={capture_cfg['preset']}")
         print()
 
         capture = BrowserCapture(self.base_dir, progress=self.progress)

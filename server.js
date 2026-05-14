@@ -126,8 +126,13 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
+
+    const vCodec = codec || 'libx264';
+    const vContainer = container || '.mp4';
+    const vPixFmt = pixFmt || 'yuv420p';
+    const vCodecParams = codecParams || {};
 
     let projectName = project;
     if (customProjectPath) {
@@ -135,7 +140,7 @@ app.post('/api/render', async (req, res) => {
         projectName = path.basename(customProjectPath);
     }
 
-    const fileName = `Render_${projectName}_${Date.now()}.mp4`;
+    const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
 
     const rendersDir = customOutputDir || path.join(APP_ROOT, 'renders');
     if (!fs.existsSync(rendersDir)) fs.mkdirSync(rendersDir, { recursive: true });
@@ -147,6 +152,7 @@ app.post('/api/render', async (req, res) => {
     log('log', `═══ Render iniciado ═══`);
     log('log', `Proyecto: ${projectName}`);
     log('log', `Resolución: ${width}x${height}, FPS: ${fps}, Duración: ${duration}s, Total cuadros: ${totalFrames}`);
+    log('log', `Codec: ${vCodec} | PixFmt: ${vPixFmt} | Container: ${vContainer} | CRF: ${crf || 18}`);
     log('log', `Color fondo: ${bgColor}`);
     log('log', `Salida: ${outputPath}`);
 
@@ -259,10 +265,18 @@ app.post('/api/render', async (req, res) => {
 
         const inputStream = new PassThrough();
 
+        const outputOpts = ['-pix_fmt', vPixFmt, '-y'];
+        if (vCodec === 'libx264') {
+            outputOpts.push('-crf', String(crf || 18));
+        }
+        for (const [key, val] of Object.entries(vCodecParams)) {
+            outputOpts.push(`-${key}`, String(val));
+        }
+
         const ffCommand = ffmpeg(inputStream)
             .inputOptions(['-f', 'image2pipe', '-vcodec', 'png', '-r', String(fps)])
-            .videoCodec('libx264')
-            .outputOptions(['-pix_fmt', 'yuv420p', '-crf', '18', '-y'])
+            .videoCodec(vCodec)
+            .outputOptions(outputOpts)
             .output(outputPath)
             .on('start', (cmd) => {
                 log('log', `FFmpeg iniciado: ${cmd}`);
