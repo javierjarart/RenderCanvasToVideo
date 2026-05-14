@@ -20,7 +20,7 @@ class ProjectManager:
                 projects.append({
                     "name": entry.name,
                     "path": str(entry),
-                    "has_config": (entry / "rendercanvas.json").exists(),
+                    "has_config": (entry / "renderCanvasCLI.json").exists(),
                 })
         return projects
 
@@ -49,7 +49,7 @@ class ProjectManager:
             "index_size": index_path.stat().st_size if index_path.exists() else 0,
             "scripts": [s.name for s in scripts],
             "styles": [s.name for s in styles],
-            "has_config": (path / "rendercanvas.json").exists(),
+            "has_config": (path / "renderCanvasCLI.json").exists(),
             "files": [str(f.relative_to(path)) for f in sorted(path.rglob("*")) if f.is_file()],
         }
 

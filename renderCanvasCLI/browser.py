@@ -9,7 +9,7 @@ import signal
 from pathlib import Path
 from typing import Optional
 
-from rendercanvas.progress import ProgressTracker
+from renderCanvasCLI.progress import ProgressTracker
 
 
 NODE_SERVER_SCRIPT = "server.js"

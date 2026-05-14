@@ -45,7 +45,7 @@ En `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "rendercanvas": {
+    "renderCanvasCLI": {
       "command": "node",
       "args": ["/ruta/completa/a/mcp-server.js"],
       "env": {

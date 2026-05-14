@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 
-CONFIG_FILE = "rendercanvas.json"
+CONFIG_FILE = "renderCanvasCLI.json"
 
 
 @dataclass

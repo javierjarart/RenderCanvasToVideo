@@ -5,11 +5,11 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from rendercanvas.config import RenderConfig, ConfigManager
-from rendercanvas.ffmpeg import find_ffmpeg, validate_ffmpeg
-from rendercanvas.browser import BrowserCapture
-from rendercanvas.progress import ProgressTracker
-from rendercanvas.project import ProjectManager
+from renderCanvasCLI.config import RenderConfig, ConfigManager
+from renderCanvasCLI.ffmpeg import find_ffmpeg, validate_ffmpeg
+from renderCanvasCLI.browser import BrowserCapture
+from renderCanvasCLI.progress import ProgressTracker
+from renderCanvasCLI.project import ProjectManager
 
 
 class Renderer:
@@ -22,7 +22,7 @@ class Renderer:
     def render(self, config: dict | None = None, preset: str | None = None, **overrides) -> str:
         overrides = {k: v for k, v in overrides.items() if v is not None}
         if preset:
-            from rendercanvas.presets import PresetManager
+            from renderCanvasCLI.presets import PresetManager
             cfg = PresetManager.apply(preset)
             cfg.update(overrides)
         elif config:
@@ -40,7 +40,7 @@ class Renderer:
             if not projects:
                 raise ValueError(
                     "No project specified and no projects found in 'proyectos/'. "
-                    "Use --project or 'python -m rendercanvas init <name>' first."
+                    "Use --project or 'python -m renderCanvasCLI init <name>' first."
                 )
             cfg["project"] = projects[0]["name"]
 

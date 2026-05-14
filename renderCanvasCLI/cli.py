@@ -3,24 +3,24 @@ import os
 import sys
 import textwrap
 
-from rendercanvas import __version__
-from rendercanvas.config import ConfigManager, RenderConfig
-from rendercanvas.renderer import Renderer
-from rendercanvas.ffmpeg import find_ffmpeg, validate_ffmpeg, get_ffmpeg_info, probe_video
-from rendercanvas.presets import PresetManager
-from rendercanvas.project import ProjectManager
+from renderCanvasCLI import __version__
+from renderCanvasCLI.config import ConfigManager, RenderConfig
+from renderCanvasCLI.renderer import Renderer
+from renderCanvasCLI.ffmpeg import find_ffmpeg, validate_ffmpeg, get_ffmpeg_info, probe_video
+from renderCanvasCLI.presets import PresetManager
+from renderCanvasCLI.project import ProjectManager
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="rendercanvas",
+        prog="renderCanvasCLI",
         description="Render HTML5 Canvas animations to MP4 video.",
         epilog="Examples:\n"
-               "  rendercanvas render --project my-anim --duration 5\n"
-               "  rendercanvas init my-project\n"
-               "  rendercanvas render --preset 4k-60 --project particle-storm\n"
-               "  rendercanvas projects\n"
-               "  rendercanvas config set fps 30\n",
+               "  renderCanvasCLI render --project my-anim --duration 5\n"
+               "  renderCanvasCLI init my-project\n"
+               "  renderCanvasCLI render --preset 4k-60 --project particle-storm\n"
+               "  renderCanvasCLI projects\n"
+               "  renderCanvasCLI config set fps 30\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -129,7 +129,7 @@ def _cmd_init(args, base_dir: str) -> int:
         path = mgr.scaffold(args.name, args.template)
         print(f"Created project '{args.name}' at {path}")
         print(f"  Edit {path / 'script.js'} to create your animation,")
-        print(f"  then run: rendercanvas render --project {args.name}")
+        print(f"  then run: renderCanvasCLI render --project {args.name}")
         return 0
     except (FileExistsError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -141,7 +141,7 @@ def _cmd_projects(args, base_dir: str) -> int:
     projects = mgr.list()
     if not projects:
         print("No projects found in 'proyectos/'")
-        print("Create one: rendercanvas init <name>")
+        print("Create one: renderCanvasCLI init <name>")
         return 0
 
     if args.info:
@@ -210,13 +210,13 @@ def _cmd_config(args, base_dir: str) -> int:
             print(f"  {key}: {value}")
     elif args.action == "get":
         if not args.key:
-            print("Usage: rendercanvas config get <key>", file=sys.stderr)
+            print("Usage: renderCanvasCLI config get <key>", file=sys.stderr)
             return 1
         val = mgr.get(args.key)
         print(val if val is not None else f"Key '{args.key}' not set")
     elif args.action == "set":
         if not args.key or args.value is None:
-            print("Usage: rendercanvas config set <key> <value>", file=sys.stderr)
+            print("Usage: renderCanvasCLI config set <key> <value>", file=sys.stderr)
             return 1
         val = _coerce_value(args.value)
         mgr.set(args.key, val)

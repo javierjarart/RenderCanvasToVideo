@@ -1,156 +1,134 @@
 (function () {
     const vscode = acquireVsCodeApi();
+    const API = 'http://localhost:3000/api';
 
     let customOutputDir = null;
     let customProjectPath = null;
+    let pollingInterval = null;
 
-    const projectSelect = document.getElementById('project');
-    const btnChooseProjectDir = document.getElementById('btnChooseProjectDir');
-    const selectedProjectDirDisplay = document.getElementById('selectedProjectDirDisplay');
-    const btnChooseDir = document.getElementById('btnChooseDir');
-    const selectedDirDisplay = document.getElementById('selectedDirDisplay');
-    const btnOpenFolder = document.getElementById('btnOpenFolder');
-    const btnCancelRender = document.getElementById('btnCancelRender');
-    const renderForm = document.getElementById('renderForm');
-    const btnRender = document.getElementById('btnRender');
-    const progressBox = document.getElementById('progressBox');
-    const progressFill = document.getElementById('progressFill');
-    const statusText = document.getElementById('statusText');
+    const $ = (id) => document.getElementById(id);
+    const btnRender = $('btnRender');
+    const progressBox = $('progressBox');
+    const progressFill = $('progressFill');
+    const statusText = $('statusText');
+    const btnOpenFolder = $('btnOpenFolder');
+    const serverStatus = $('serverStatus');
 
-    let currentFilePath = null;
+    async function api(url, options) {
+        const res = await fetch(url, options);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+    }
 
-    vscode.postMessage({ type: 'getProjects' });
+    async function checkServer() {
+        try {
+            await api(API + '/health');
+            serverStatus.textContent = '✓ Connected';
+            serverStatus.className = 'server-status connected';
+        } catch {
+            serverStatus.textContent = '✗ Disconnected';
+            serverStatus.className = 'server-status disconnected';
+            setTimeout(checkServer, 2000);
+        }
+    }
+    checkServer();
+
+    $('btnChooseProjectDir').onclick = () => vscode.postMessage({ type: 'chooseProjectDir' });
+    $('btnChooseDir').onclick = () => vscode.postMessage({ type: 'chooseOutputDir' });
+
+    if (btnOpenFolder) {
+        btnOpenFolder.onclick = () => {
+            vscode.postMessage({ type: 'openPath', path: customOutputDir || '' });
+        };
+    }
 
     window.addEventListener('message', (event) => {
         const msg = event.data;
         switch (msg.type) {
-            case 'projectList':
-                projectSelect.innerHTML = msg.projects.length === 0
-                    ? '<option value="">No projects found in workspace</option>'
-                    : msg.projects.map(p => `<option value="${p.path}">${p.name}</option>`).join('');
-                break;
-
             case 'outputDirChosen':
                 customOutputDir = msg.path;
-                selectedDirDisplay.innerText = msg.path;
+                $('selectedDirDisplay').innerText = msg.path;
                 break;
-
             case 'projectDirChosen':
                 customProjectPath = msg.path;
-                selectedProjectDirDisplay.innerText = msg.path;
-                projectSelect.value = '';
-                projectSelect.disabled = true;
-                if (!document.getElementById('btnCancelCustomProject')) {
-                    const btnCancel = document.createElement('button');
-                    btnCancel.id = 'btnCancelCustomProject';
-                    btnCancel.innerText = '✕';
-                    btnCancel.type = 'button';
-                    btnCancel.style.width = '30px';
-                    btnCancel.style.padding = '5px';
-                    btnCancel.style.marginTop = '0';
-                    btnCancel.onclick = () => {
-                        customProjectPath = null;
-                        selectedProjectDirDisplay.innerText = 'Or use workspace /proyectos';
-                        projectSelect.disabled = false;
-                        btnCancel.remove();
-                    };
-                    selectedProjectDirDisplay.parentNode.appendChild(btnCancel);
-                }
-                break;
-
-            case 'renderStart':
-                btnRender.disabled = true;
-                btnRender.innerText = '⏳ Rendering...';
-                progressBox.style.display = 'block';
-                btnOpenFolder.style.display = 'none';
-                btnCancelRender.style.display = 'inline-block';
-                progressFill.style.width = '0%';
-                statusText.innerText = 'Rendering: 0 / ' + msg.total + ' frames (0%)';
-                break;
-
-            case 'renderProgress':
-                const pct = Math.round((msg.current / msg.total) * 100);
-                statusText.innerText = 'Rendering: ' + msg.current + ' / ' + msg.total + ' frames (' + pct + '%)';
-                progressFill.style.width = pct + '%';
-                break;
-
-            case 'renderDone':
-                statusText.innerText = 'Render completed!';
-                progressFill.style.width = '100%';
-                btnOpenFolder.style.display = 'block';
-                btnCancelRender.style.display = 'none';
-                btnRender.disabled = false;
-                btnRender.innerText = '▶ Start New Render';
-                currentFilePath = msg.filePath;
-                break;
-
-            case 'renderError':
-                statusText.innerText = 'Error: ' + msg.error;
-                btnRender.disabled = false;
-                btnRender.innerText = '▶ Retry';
-                btnCancelRender.style.display = 'none';
-                break;
-
-            case 'renderCancelled':
-                statusText.innerText = 'Render cancelled';
-                btnRender.disabled = false;
-                btnRender.innerText = '▶ Start Render';
-                btnCancelRender.style.display = 'none';
+                $('selectedProjectDirDisplay').innerText = msg.path;
+                $('selectedDirDisplay').innerText = customOutputDir || '';
                 break;
         }
     });
 
-    if (btnChooseProjectDir) {
-        btnChooseProjectDir.onclick = () => {
-            vscode.postMessage({ type: 'chooseProjectDir' });
-        };
-    }
+    $('renderForm').onsubmit = async (e) => {
+        e.preventDefault();
 
-    if (btnChooseDir) {
-        btnChooseDir.onclick = () => {
-            vscode.postMessage({ type: 'chooseOutputDir' });
-        };
-    }
+        if (!customProjectPath) {
+            statusText.textContent = 'Please select an input folder first.';
+            progressBox.style.display = 'block';
+            btnOpenFolder.style.display = 'none';
+            return;
+        }
 
-    if (btnOpenFolder) {
-        btnOpenFolder.onclick = () => {
-            const dir = customOutputDir || (currentFilePath ? currentFilePath.substring(0, currentFilePath.lastIndexOf('/')) : 'renders');
-            vscode.postMessage({ type: 'openPath', path: dir });
-        };
-    }
+        btnRender.disabled = true;
+        btnRender.innerText = '⏳ Rendering...';
+        progressBox.style.display = 'block';
+        btnOpenFolder.style.display = 'none';
+        progressFill.style.width = '0%';
+        statusText.innerText = 'Starting render...';
 
-    if (btnCancelRender) {
-        btnCancelRender.onclick = () => {
-            vscode.postMessage({ type: 'cancelRender' });
-        };
-    }
-
-    if (renderForm) {
-        renderForm.onsubmit = (e) => {
-            e.preventDefault();
-
-            const project = projectSelect.value;
-            if (!project && !customProjectPath) {
-                statusText.innerText = 'Please select a project or external folder.';
-                progressBox.style.display = 'block';
-                btnOpenFolder.style.display = 'none';
-                btnCancelRender.style.display = 'none';
-                return;
-            }
-
-            vscode.postMessage({
-                type: 'startRender',
-                config: {
-                    project: project,
+        try {
+            await api(API + '/render', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    project: '',
                     customProjectPath: customProjectPath,
-                    width: document.getElementById('width').value,
-                    height: document.getElementById('height').value,
-                    fps: document.getElementById('fps').value,
-                    duration: document.getElementById('duration').value,
-                    bgColor: document.getElementById('bgColor').value,
+                    width: $('width').value,
+                    height: $('height').value,
+                    fps: $('fps').value,
+                    duration: $('duration').value,
+                    bgColor: $('bgColor').value,
                     customOutputDir: customOutputDir,
-                }
+                })
             });
-        };
-    }
+        } catch (err) {
+            statusText.innerText = '❌ Error: ' + err.message;
+            btnRender.disabled = false;
+            btnRender.innerText = '▶ Retry';
+            return;
+        }
+
+        if (pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = setInterval(async () => {
+            try {
+                const status = await api(API + '/status');
+                if (status.state === 'rendering') {
+                    const pct = Math.round((status.progress / status.total) * 100);
+                    statusText.innerText = 'Rendering: ' + status.progress + ' / ' + status.total + ' frames (' + pct + '%)';
+                    progressFill.style.width = pct + '%';
+                } else if (status.state === 'done') {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    statusText.innerText = '✅ Render completed!';
+                    progressFill.style.width = '100%';
+                    btnOpenFolder.style.display = 'block';
+                    btnRender.disabled = false;
+                    btnRender.innerText = '▶ Start New Render';
+                } else if (status.state === 'error') {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    statusText.innerText = '❌ Error: ' + status.error;
+                    btnRender.disabled = false;
+                    btnRender.innerText = '▶ Retry';
+                }
+            } catch {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                statusText.innerText = '❌ Connection lost';
+                btnRender.disabled = false;
+                btnRender.innerText = '▶ Retry';
+            }
+        }, 1000);
+    };
 })();
