@@ -21,3 +21,6 @@ bin/ffmpeg_extracted/
 
 # Plan de migración
 MIGRATE_DEPS.md
+
+# VS Code extension
+vscode-extension/
