@@ -40,6 +40,9 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--output", "-o", help="Output directory")
     r.add_argument("--crf", type=int, help="FFmpeg CRF quality (0-51, lower=better)")
     r.add_argument("--ffpreset", "--ffmpeg-preset", dest="ffpreset", help="FFmpeg preset (ultrafast, medium, slow, etc.)")
+    r.add_argument("--codec", help="Video codec (libx264, hap, cfhd)")
+    r.add_argument("--container", help="Container extension (.mp4, .mov)")
+    r.add_argument("--pix-fmt", dest="pix_fmt", help="Pixel format (yuv420p, yuv422p)")
 
     i = sub.add_parser("init", help="Scaffold a new canvas project")
     i.add_argument("name", help="Project name")
@@ -110,6 +113,12 @@ def _cmd_render(args, base_dir: str) -> int:
         overrides["crf"] = args.crf
     if args.ffpreset:
         overrides["ffmpeg_preset"] = args.ffpreset
+    if args.codec:
+        overrides["codec"] = args.codec
+    if args.container:
+        overrides["container"] = args.container
+    if args.pix_fmt:
+        overrides["pix_fmt"] = args.pix_fmt
 
     kwargs = {}
     if args.preset:
@@ -193,11 +202,14 @@ def _cmd_presets(args) -> int:
         print(desc)
     else:
         presets = PresetManager.list()
-        print(f"{'Name':<16} {'Resolution':<14} {'FPS':<6} {'CRF':<5} {'Preset':<12} Description")
-        print("-" * 90)
+        print(f"{'Name':<16} {'Resolution':<14} {'FPS':<6} {'Codec':<10} {'Container':<10} {'Preset':<12} Description")
+        print("-" * 110)
         for name, p in presets.items():
             res = f"{p['width']}x{p['height']}"
-            print(f"{name:<16} {res:<14} {p['fps']:<6} {p['crf']:<5} {p['preset']:<12} {p['description']}")
+            crf_str = str(p.get('crf', '-')) if 'crf' in p else '-'
+            codec = p.get('codec', 'libx264')
+            container = p.get('container', '.mp4')
+            print(f"{name:<16} {res:<14} {p['fps']:<6} {codec:<10} {container:<10} {p['preset']:<12} {p['description']}")
     return 0
 
 

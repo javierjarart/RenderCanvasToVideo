@@ -9,12 +9,7 @@ from typing import Optional
 def find_ffmpeg() -> Optional[str]:
     candidates = [
         os.getenv("FFMPEG_PATH"),
-        shutil.which("ffmpeg"),
     ]
-
-    node_ffmpeg_static = _find_node_ffmpeg_static()
-    if node_ffmpeg_static:
-        candidates.append(node_ffmpeg_static)
 
     bundled = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bin", "ffmpeg")
     if platform.system() == "Windows":
@@ -23,6 +18,12 @@ def find_ffmpeg() -> Optional[str]:
             candidates.append(bundled_exe)
     elif os.path.exists(bundled):
         candidates.append(bundled)
+
+    node_ffmpeg_static = _find_node_ffmpeg_static()
+    if node_ffmpeg_static:
+        candidates.append(node_ffmpeg_static)
+
+    candidates.append(shutil.which("ffmpeg"))
 
     for path in candidates:
         if path and os.path.exists(path):

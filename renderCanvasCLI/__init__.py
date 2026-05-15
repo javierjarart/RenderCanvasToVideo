@@ -2,7 +2,7 @@
 renderCanvasCLI — Python CLI for rendering HTML5 Canvas animations to MP4.
 """
 
-__version__ = "2.0.0"
+__version__ = "0.1.0"
 __author__ = "Javier Jara"
 
 from renderCanvasCLI.config import RenderConfig

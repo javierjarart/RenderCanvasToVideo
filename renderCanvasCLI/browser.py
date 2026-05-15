@@ -99,6 +99,10 @@ class BrowserCapture:
         output_dir = config.get("output_dir", os.path.join(self.base_dir, "renders"))
         crf = config.get("crf", 18)
         ffmpeg_preset = config.get("preset", "medium")
+        codec = config.get("codec", "libx264")
+        container = config.get("container", ".mp4")
+        pix_fmt = config.get("pix_fmt", "yuv420p")
+        codec_params = config.get("codec_params", {})
 
         total_frames = fps * duration
         os.makedirs(output_dir, exist_ok=True)
@@ -114,6 +118,10 @@ class BrowserCapture:
             "customOutputDir": output_dir,
             "crf": crf,
             "ffmpegPreset": ffmpeg_preset,
+            "codec": codec,
+            "container": container,
+            "pixFmt": pix_fmt,
+            "codecParams": codec_params,
         }
         if custom_path:
             payload["customProjectPath"] = custom_path
