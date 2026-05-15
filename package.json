@@ -4,7 +4,7 @@
   "description": "RenderCanvasToVideo  — standalone app",
   "main": "main.js",
   "author": "Javier Jara",
-  "license": "ISC",
+  "license": "MIT",
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",

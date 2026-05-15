@@ -160,4 +160,12 @@ python -m renderCanvasCLI render --project mi-animacion --codec cfhd --pix-fmt y
 
 ## Licencia
 
-MIT
+MIT — ver [LICENSE](LICENSE).
+
+Este proyecto incluye componentes de terceros con sus propias licencias:
+- **FFmpeg** y **x264** — [GPL-2.0+](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
+- **HAP** — [BSD 2-Clause](https://opensource.org/license/bsd-2-clause)
+- **GoPro CineForm** — código abierto por GoPro, Inc.
+- **H.264/AVC** — sujeto al [AVC Patent Portfolio License](http://www.mpegla.com) para uso personal y no comercial
+
+Ver [NOTICE.md](NOTICE.md) para las atribuciones completas y el aviso de patentes.
