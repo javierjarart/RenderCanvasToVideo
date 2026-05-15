@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { fork } = require('child_process');
 
 let mainWindow;
@@ -47,6 +48,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
@@ -81,8 +83,11 @@ ipcMain.handle('choose-project-dir', async () => {
 });
 
 ipcMain.handle('open-path', async (event, targetPath) => {
-  if (targetPath) {
-    await shell.openPath(targetPath);
+  if (targetPath && typeof targetPath === 'string') {
+    const resolved = path.resolve(targetPath);
+    if (fs.existsSync(resolved)) {
+      await shell.openPath(resolved);
+    }
   }
 });
 

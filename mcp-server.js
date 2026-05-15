@@ -15,8 +15,18 @@ function resolveFfmpegPath() {
 }
 const { install, getInstalledBrowsers, resolveBuildId, detectBrowserPlatform, Browser } = require('@puppeteer/browsers');
 
+const ALLOWED_CODEC_PARAMS = new Set(['format', 'quality']);
+
 const app = express();
 app.use(express.json());
+
+app.use((req, res, next) => {
+    res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+    );
+    next();
+});
 
 const APP_ROOT = process.env.APP_ROOT || __dirname;
 const CHROME_CACHE_DIR = process.env.CHROME_CACHE_DIR || path.join(APP_ROOT, '.cache', 'puppeteer');
@@ -52,7 +62,10 @@ app.use('/renders', express.static(path.join(APP_ROOT, 'renders')));
 
 app.use('/external-project', (req, res, next) => {
     if (currentCustomProjectPath && fs.existsSync(currentCustomProjectPath)) {
-        return express.static(currentCustomProjectPath)(req, res, next);
+        return express.static(currentCustomProjectPath, {
+            dotfiles: 'deny',
+            index: ['index.html'],
+        })(req, res, next);
     }
     res.status(404).send('Proyecto externo no configurado o no encontrado');
 });
@@ -87,8 +100,14 @@ app.post('/api/render', async (req, res) => {
 
     let projectName = project;
     if (customProjectPath) {
-        currentCustomProjectPath = customProjectPath;
-        projectName = path.basename(customProjectPath);
+        const resolved = path.isAbsolute(customProjectPath)
+            ? path.resolve(customProjectPath)
+            : resolveSafe(APP_ROOT, customProjectPath);
+        if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+            return res.status(400).json({ error: `Ruta de proyecto inválida: ${customProjectPath}` });
+        }
+        currentCustomProjectPath = resolved;
+        projectName = path.basename(resolved);
     }
 
     const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
@@ -167,7 +186,9 @@ app.post('/api/render', async (req, res) => {
             codecArgs.push('-crf', String(crf || 18));
         }
         for (const [key, val] of Object.entries(vCodecParams)) {
-            codecArgs.push(`-${key}`, String(val));
+            if (ALLOWED_CODEC_PARAMS.has(key)) {
+                codecArgs.push(`-${key}`, String(val));
+            }
         }
 
         const ffmpeg = spawn(resolveFfmpegPath(), [
@@ -321,8 +342,17 @@ async function main() {
 
             let projectName = project;
             if (customProjectPath) {
-                currentCustomProjectPath = customProjectPath;
-                projectName = path.basename(customProjectPath);
+                const resolved = path.isAbsolute(customProjectPath)
+                    ? path.resolve(customProjectPath)
+                    : resolveSafe(APP_ROOT, customProjectPath);
+                if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+                    return {
+                        content: [{ type: 'text', text: `Invalid project path: ${customProjectPath}` }],
+                        isError: true
+                    };
+                }
+                currentCustomProjectPath = resolved;
+                projectName = path.basename(resolved);
             }
 
             const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
@@ -490,7 +520,12 @@ async function main() {
                     loaded = true;
                 } catch (e) {
                     const htmlPath = args.customProjectPath
-                        ? path.join(args.customProjectPath, 'index.html')
+                        ? (() => {
+                            const resolved = path.isAbsolute(args.customProjectPath)
+                                ? path.resolve(args.customProjectPath, 'index.html')
+                                : resolveSafe(APP_ROOT, args.customProjectPath, 'index.html');
+                            return resolved;
+                        })()
                         : path.join(APP_ROOT, 'proyectos', args.project, 'index.html');
                     if (fs.existsSync(htmlPath)) {
                         await page.setContent(fs.readFileSync(htmlPath, 'utf-8'), { waitUntil: 'domcontentloaded', timeout: 10000 });
@@ -769,7 +804,9 @@ async function renderLoop(params) {
             codecArgs2.push('-crf', String(crf || 18));
         }
         for (const [key, val] of Object.entries(codecParams || {})) {
-            codecArgs2.push(`-${key}`, String(val));
+            if (ALLOWED_CODEC_PARAMS.has(key)) {
+                codecArgs2.push(`-${key}`, String(val));
+            }
         }
 
         const ffmpeg = spawn(resolveFfmpegPath(), [

@@ -6,6 +6,14 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
 const { PassThrough } = require('stream');
 
+function resolveSafe(base, ...paths) {
+    const resolved = path.resolve(base, ...paths);
+    if (!resolved.startsWith(path.resolve(base))) {
+        throw new Error(`Path traversal detected: ${paths.join('/')}`);
+    }
+    return resolved;
+}
+
 function resolveFfmpegPath() {
     const isWin = process.platform === 'win32';
     const binaryName = isWin ? 'ffmpeg.exe' : 'ffmpeg';
@@ -17,8 +25,18 @@ function resolveFfmpegPath() {
 }
 const { install, getInstalledBrowsers, resolveBuildId, detectBrowserPlatform, Browser } = require('@puppeteer/browsers');
 
+const ALLOWED_CODEC_PARAMS = new Set(['format', 'quality']);
+
 const app = express();
 app.use(express.json());
+
+app.use((req, res, next) => {
+    res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+    );
+    next();
+});
 
 const APP_ROOT = process.env.APP_ROOT || __dirname;
 const CHROME_CACHE_DIR = process.env.CHROME_CACHE_DIR || path.join(APP_ROOT, '.cache', 'puppeteer');
@@ -107,7 +125,10 @@ app.use('/external-project', (req, res, next) => {
             log('error', `[external-project] Ruta no existe: ${currentCustomProjectPath}`);
             return res.status(404).send(`Ruta no encontrada: ${currentCustomProjectPath}`);
         }
-        return express.static(currentCustomProjectPath)(req, res, next);
+        return express.static(currentCustomProjectPath, {
+            dotfiles: 'deny',
+            index: ['index.html'],
+        })(req, res, next);
     }
     res.status(404).send('Proyecto externo no configurado o no encontrado');
 });
@@ -152,7 +173,9 @@ app.post('/api/render', async (req, res) => {
 
     let projectName = project;
     if (customProjectPath) {
-        const resolved = path.resolve(customProjectPath);
+        const resolved = path.isAbsolute(customProjectPath)
+            ? path.resolve(customProjectPath)
+            : resolveSafe(APP_ROOT, customProjectPath);
         if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
             return res.status(400).json({ error: `Ruta de proyecto inválida: ${customProjectPath}` });
         }
@@ -292,7 +315,9 @@ app.post('/api/render', async (req, res) => {
             outputOpts.push('-crf', String(crf || 18));
         }
         for (const [key, val] of Object.entries(vCodecParams)) {
-            outputOpts.push(`-${key}`, String(val));
+            if (ALLOWED_CODEC_PARAMS.has(key)) {
+                outputOpts.push(`-${key}`, String(val));
+            }
         }
 
         const ffCommand = ffmpeg(inputStream)
