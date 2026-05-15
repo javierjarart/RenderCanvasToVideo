@@ -1,23 +1,29 @@
 # RenderCanvasToVideo
 
-Convierte animaciones HTML5 Canvas a video MP4/MOV.  
-Captura frame por frame con Puppeteer + Chromium y las encadena con FFmpeg.
+# Canvas to Video
 
-Puede renderizar a cualquier FPS (15, 60, 120...)
-Lee el buffer interno del canvas — puro, sin interferencias
-Renderiza a cualquier resolución (incluso 4K/8K en un monitor HD)
-Cada frame es determinista y exacto — mismo tiempo entre frames
-Simula cualquier tasa de frames independientemente del hardware
+Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
 
-Porque no grabar directamente el browser o utilizar un OP como WebRender? 
+## ¿Por qué?
 
-Limitado a fps reales (ej: 30-60 reales)
-Depende del tiempo real (1 min de video = 1 min real)
-Captura píxeles del monitor (comprimido, con aliasing de ventanas/notificaciones)
-Resolución ligada a la pantalla física
-Cada frame tiene latencia variable (vsync, driver)
-No puede capturar código que corre a 60fps en una pantalla de 30Hz
+Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 
+| | Grabación directa | **Canvas to Video** |
+|---|---|---|
+| FPS | Limitado al hardware real (30–60 fps) | Cualquier FPS (15, 60, 120…) |
+| Duración | 1 min de video = 1 min real | Renderizado fuera de tiempo real |
+| Calidad | Píxeles comprimidos del monitor, con aliasing | Buffer interno del canvas — sin pérdida |
+| Resolución | Ligada a la pantalla física | Cualquier resolución (4K, 8K…) |
+| Determinismo | Latencia variable por vsync/drivers | Cada frame es exacto y reproducible |
+| Compatibilidad | No captura 60 fps en pantalla de 30 Hz | Independiente del hardware |
+
+## Características
+
+- **Cualquier FPS** — renderiza a 15, 60, 120 o cualquier tasa arbitraria
+- **Lectura directa del buffer** — accede al canvas puro, sin interferencias del sistema operativo
+- **Resoluciones arbitrarias** — incluso 4K/8K desde un monitor HD
+- **Frames deterministas** — intervalo de tiempo exacto entre cada frame
+- **Independencia de hardware** — simula cualquier tasa de frames sin importar el dispositivo
 
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)]()
