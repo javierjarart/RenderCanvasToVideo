@@ -3,15 +3,20 @@
 Convierte animaciones HTML5 Canvas a video MP4/MOV.  
 Captura frame por frame con Puppeteer + Chromium y las encadena con FFmpeg.
 
-[![Version](https://img.shields.io/badge/version-0.0.3-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 ---
 
-## Descarga
+## 🚀 Características
 
-**Windows:**  
-[RenderCanvasToVideo.Setup.0.0.3.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/download/v.0.0.3/RenderCanvasToVideo.Setup.0.0.3.exe)
+- **🎨 Renderiza cualquier `<canvas>`** — Proyectos locales o cualquier carpeta con `index.html` + canvas
+- **🎬 Múltiples códecs profesionales** — H.264, HAP (Q/Alpha), CineForm (CFHD), ProRes
+- **🖥️ App de escritorio** — Interfaz gráfica nativa con selectores de carpeta y progreso en tiempo real
+- **🐍 CLI Python** — Scripteable, configurable, ideal para pipelines automatizados
+- **🤖 Integración con IA** — Servidor MCP compatible con Claude Desktop, Cursor y otros asistentes
+- **🔧 Auto-configurable** — Chromium y FFmpeg se descargan automáticamente en primera ejecución
+- **🪟🐧🍎 Multiplataforma** — Windows, Linux, macOS
 
 ---
 
@@ -30,8 +35,6 @@ npm start
 pip install -e .
 python -m renderCanvasCLI --help
 ```
-
-Subcomandos:
 
 | Comando | Descripción |
 |---------|-------------|
@@ -54,46 +57,38 @@ Documentación completa en [`docs/mcp-server.md`](docs/mcp-server.md).
 
 ---
 
-## Requisitos
-
-- Node.js 18+
-- Python 3.10+
-- Windows, macOS o Linux
-
----
-
 ## Presets de renderizado
 
-### H.264 (formato MP4)
+### H.264 (MP4)
 
-| Preset | Resolución | FPS | Codec | Uso |
-|--------|-----------|-----|-------|-----|
-| `hd-30` | 1920×1080 | 30 | libx264 | Calidad estándar |
-| `hd-60` | 1920×1080 | 60 | libx264 | Calidad fluida |
-| `fullhd-60` | 1920×1080 | 60 | libx264 | Alta calidad |
-| `4k-30` | 3840×2160 | 30 | libx264 | 4K estándar |
-| `4k-60` | 3840×2160 | 60 | libx264 | 4K fluido |
-| `square-1k-30` | 1080×1080 | 30 | libx264 | Redes sociales |
-| `vertical-hd-30` | 1080×1920 | 30 | libx264 | Stories/Reels |
-| `preview` | 640×360 | 15 | libx264 | Borrador rápido |
-| `draft` | 854×480 | 24 | libx264 | Vista previa |
+| Preset | Resolución | FPS | Uso |
+|--------|-----------|-----|-----|
+| `hd-30` | 1920×1080 | 30 | Calidad estándar |
+| `hd-60` | 1920×1080 | 60 | Calidad fluida |
+| `fullhd-60` | 1920×1080 | 60 | Alta calidad |
+| `4k-30` | 3840×2160 | 30 | 4K estándar |
+| `4k-60` | 3840×2160 | 60 | 4K fluido |
+| `square-1k-30` | 1080×1080 | 30 | Redes sociales |
+| `vertical-hd-30` | 1080×1920 | 30 | Stories/Reels |
+| `preview` | 640×360 | 15 | Borrador rápido |
+| `draft` | 854×480 | 24 | Vista previa |
 
-### HAP (formato MOV — reproducción en tiempo real)
+### HAP (MOV — reproducción en tiempo real)
 
-| Preset | Resolución | FPS | Codec | Contenedor |
-|--------|-----------|-----|-------|------------|
-| `hap-q-hd` | 1920×1080 | 60 | HAP_Q | .mov |
-| `hap-q-4k` | 3840×2160 | 30 | HAP_Q | .mov |
-| `hap-alpha-hd` | 1920×1080 | 60 | HAP_Alpha | .mov |
+| Preset | Resolución | FPS | Codec |
+|--------|-----------|-----|-------|
+| `hap-q-hd` | 1920×1080 | 60 | HAP_Q |
+| `hap-q-4k` | 3840×2160 | 30 | HAP_Q |
+| `hap-alpha-hd` | 1920×1080 | 60 | HAP_Alpha |
 
-### CineForm (formato MOV)
+### CineForm (MOV)
 
-| Preset | Resolución | FPS | Codec | Calidad | Contenedor |
-|--------|-----------|-----|-------|---------|------------|
-| `cfhd-film-hd` | 1920×1080 | 60 | CineForm | Film (máxima) | .mov |
-| `cfhd-high-hd` | 1920×1080 | 60 | CineForm | High | .mov |
-| `cfhd-medium-hd` | 1920×1080 | 60 | CineForm | Medium | .mov |
-| `cfhd-film-4k` | 3840×2160 | 30 | CineForm | Film (máxima) | .mov |
+| Preset | Resolución | FPS | Calidad |
+|--------|-----------|-----|---------|
+| `cfhd-film-hd` | 1920×1080 | 60 | Film (máxima) |
+| `cfhd-high-hd` | 1920×1080 | 60 | High |
+| `cfhd-medium-hd` | 1920×1080 | 60 | Medium |
+| `cfhd-film-4k` | 3840×2160 | 30 | Film (máxima) |
 
 ---
 
@@ -122,18 +117,6 @@ python -m renderCanvasCLI render --project mi-animacion --codec cfhd --pix-fmt y
 
 ---
 
-## Compilar distribución
-
-```bash
-npm run dist:win    # Windows (.exe)
-npm run dist:mac    # macOS (.dmg)
-npm run dist:linux  # Linux (.AppImage)
-```
-
-El instalador se genera en `dist/`.
-
----
-
 ## Estructura del proyecto
 
 ```
@@ -154,7 +137,6 @@ El instalador se genera en `dist/`.
 ├── public/                 # UI de escritorio
 ├── proyectos/              # Animaciones fuente
 ├── renders/                # Videos generados
-├── renderCanvasCLI.json    # Configuración por defecto
 └── docs/mcp-server.md      # Documentación MCP
 ```
 
