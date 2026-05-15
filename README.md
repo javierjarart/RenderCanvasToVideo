@@ -1,7 +1,5 @@
 # RenderCanvasToVideo
 
-# Canvas to Video
-
 Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
 
 ## ¿Por qué?
