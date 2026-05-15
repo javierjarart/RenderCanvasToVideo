@@ -90,11 +90,21 @@ function extractZip(src, destDir, innerPath) {
   if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true });
   fs.mkdirSync(tmp, { recursive: true });
   try {
-    // Try unzip first (Linux/macOS), then PowerShell (Windows)
-    try {
-      execSync(`unzip -o "${src}" -d "${tmp}"`, { stdio: 'pipe' });
-    } catch {
+    const isWin = process.platform === 'win32';
+    if (isWin) {
       execSync(`powershell -Command "Expand-Archive -Path '${src}' -DestinationPath '${tmp}'"`, { stdio: 'pipe' });
+    } else {
+      try {
+        execSync(`unzip -o "${src}" -d "${tmp}"`, { stdio: 'pipe' });
+      } catch {
+        throw new Error(
+          'unzip is not installed. Install it with:\n' +
+          '  Debian/Ubuntu: sudo apt install unzip\n' +
+          '  RHEL/Fedora:   sudo dnf install unzip\n' +
+          '  Arch:          sudo pacman -S unzip\n' +
+          '  macOS:         brew install unzip'
+        );
+      }
     }
     // Search for the binary in the extracted files
     const files = execSync(`find "${tmp}" -type f -name "ffmpeg*"`, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
@@ -117,9 +127,21 @@ function extractZip(src, destDir, innerPath) {
   if (platform === 'darwin' || platform === 'mac') platform = 'macos';
   if (platform === 'linux') platform = 'linux64';
 
+  const currentOs = process.platform;
+  const isCrossBuild = (
+    (platform === 'win64' && currentOs !== 'win32') ||
+    (platform === 'linux64' && currentOs !== 'linux') ||
+    (platform === 'macos' && currentOs !== 'darwin')
+  );
+  if (isCrossBuild) {
+    console.warn(`⚠ Compilación cruzada: descargando FFmpeg para ${platform} desde ${currentOs}`);
+  }
+
   const root = path.join(__dirname, '..');
   const binDir = path.join(root, 'bin');
   if (!fs.existsSync(binDir)) fs.mkdirSync(binDir, { recursive: true });
+
+  console.log(`Plataforma detectada: ${platform} (arg: ${process.argv[2] || 'auto'})`);
 
   const { binName, arch } = getPlatformInfo(platform);
   const outPath = path.join(binDir, binName);
