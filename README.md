@@ -3,6 +3,23 @@
 Convierte animaciones HTML5 Canvas a video MP4/MOV.  
 Captura frame por frame con Puppeteer + Chromium y las encadena con FFmpeg.
 
+Puede renderizar a cualquier FPS (15, 60, 120...)
+Lee el buffer interno del canvas — puro, sin interferencias
+Renderiza a cualquier resolución (incluso 4K/8K en un monitor HD)
+Cada frame es determinista y exacto — mismo tiempo entre frames
+Simula cualquier tasa de frames independientemente del hardware
+
+Porque no grabar directamente el browser o utilizar un OP como WebRender? 
+
+Limitado a fps reales (ej: 30-60 reales)
+Depende del tiempo real (1 min de video = 1 min real)
+Captura píxeles del monitor (comprimido, con aliasing de ventanas/notificaciones)
+Resolución ligada a la pantalla física
+Cada frame tiene latencia variable (vsync, driver)
+No puede capturar código que corre a 60fps en una pantalla de 30Hz
+
+
+
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
