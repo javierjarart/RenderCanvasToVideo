@@ -11,7 +11,7 @@ Captura frame por frame con Puppeteer + Chromium y las encadena con FFmpeg.
 ## 🚀 Características
 
 - **🎨 Renderiza cualquier `<canvas>`** — Proyectos locales o cualquier carpeta con `index.html` + canvas
-- **🎬 Múltiples códecs profesionales** — H.264, HAP (Q/Alpha), CineForm (CFHD), ProRes
+- **🎬 Múltiples códecs profesionales** — H.264, HAP (Q/Alpha), CineForm (CFHD)
 - **🖥️ App de escritorio** — Interfaz gráfica nativa con selectores de carpeta y progreso en tiempo real
 - **🐍 CLI Python** — Scripteable, configurable, ideal para pipelines automatizados
 - **🤖 Integración con IA** — Servidor MCP compatible con Claude Desktop, Cursor y otros asistentes
