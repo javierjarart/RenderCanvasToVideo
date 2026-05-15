@@ -11,10 +11,10 @@ const PRESETS = {
   "hap-q-hd":        { name: "HAP_Q HD",         width: 1920, height: 1080, fps: 60, codec: "hap",    container: ".mov", pixFmt: "yuv420p", codecParams: { format: "hap_q" } },
   "hap-q-4k":        { name: "HAP_Q 4K",         width: 3840, height: 2160, fps: 30, codec: "hap",    container: ".mov", pixFmt: "yuv420p", codecParams: { format: "hap_q" } },
   "hap-alpha-hd":    { name: "HAP_Alpha HD",     width: 1920, height: 1080, fps: 60, codec: "hap",    container: ".mov", pixFmt: "yuv420p", codecParams: { format: "hap_alpha" } },
-  "cfhd-film-hd":    { name: "CineForm Film HD", width: 1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film" } },
+  "cfhd-film-hd":    { name: "CineForm Film HD", width: 1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film1" } },
   "cfhd-high-hd":    { name: "CineForm High HD", width: 1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "high" } },
   "cfhd-medium-hd":  { name: "CineForm Medium HD",width:1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "medium" } },
-  "cfhd-film-4k":    { name: "CineForm Film 4K", width: 3840, height: 2160, fps: 30, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film" } },
+  "cfhd-film-4k":    { name: "CineForm Film 4K", width: 3840, height: 2160, fps: 30, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film1" } },
 };
 
 const GROUP_LABELS = {
