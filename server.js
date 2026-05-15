@@ -60,9 +60,24 @@ let currentCustomProjectPath = null;
 const logBuffer = [];
 const MAX_LOG_LINES = 2000;
 
+function sanitizePath(msg) {
+    if (typeof msg !== 'string') return msg;
+    return msg.split(APP_ROOT).join('<root>');
+}
+
+function sanitizeArgs(args) {
+    return args.map(a => {
+        if (typeof a === 'string') return sanitizePath(a);
+        if (a instanceof Error) return sanitizePath(a.stack || a.message);
+        if (typeof a === 'object') return sanitizePath(JSON.stringify(a, null, 2));
+        return a;
+    });
+}
+
 function captureLog(level, args) {
     const timestamp = new Date().toLocaleTimeString();
-    const message = args.map(a => typeof a === 'object' ? (a instanceof Error ? a.stack || a.message : JSON.stringify(a, null, 2)) : String(a)).join(' ');
+    const sanitized = sanitizeArgs(args);
+    const message = sanitized.map(a => typeof a === 'object' ? (a instanceof Error ? a.stack || a.message : JSON.stringify(a, null, 2)) : String(a)).join(' ');
     logBuffer.push({ timestamp, level, message });
     if (logBuffer.length > MAX_LOG_LINES) logBuffer.splice(0, logBuffer.length - MAX_LOG_LINES);
 }
@@ -137,8 +152,12 @@ app.post('/api/render', async (req, res) => {
 
     let projectName = project;
     if (customProjectPath) {
-        currentCustomProjectPath = customProjectPath;
-        projectName = path.basename(customProjectPath);
+        const resolved = path.resolve(customProjectPath);
+        if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+            return res.status(400).json({ error: `Ruta de proyecto inválida: ${customProjectPath}` });
+        }
+        currentCustomProjectPath = resolved;
+        projectName = path.basename(resolved);
     }
 
     const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
@@ -179,14 +198,16 @@ app.post('/api/render', async (req, res) => {
 
         log('log', `Lanzando Chromium desde: ${chromeExecutablePath}`);
 
+        const chromeArgs = [
+            '--disable-dev-shm-usage'
+        ];
+        if (!chromeExecutablePath || process.env.NODE_ENV === 'development') {
+            chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+        }
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: chromeExecutablePath,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage'
-            ],
+            args: chromeArgs,
         });
 
         log('log', 'Chromium lanzado correctamente.');
@@ -289,11 +310,11 @@ app.post('/api/render', async (req, res) => {
                 log('error', `FFmpeg error: ${err.message}`);
                 renderStatus.state = 'error';
                 renderStatus.error = err.message;
-                browser.close().catch(() => {});
+                browser.close().catch(e => log('error', 'Error closing browser:', e.message));
             })
             .on('end', () => {
                 log('log', 'FFmpeg finalizado correctamente.');
-                browser.close().catch(() => {});
+                browser.close().catch(e => log('error', 'Error closing browser:', e.message));
                 renderStatus.state = 'done';
                 renderStatus.fileUrl = `/renders/${fileName}`;
             });
@@ -356,7 +377,7 @@ async function start() {
     } else {
         log('log', `Chromium encontrado en: ${chromeExecutablePath}`);
     }
-    app.listen(PORT, () => {
+    app.listen(PORT, '127.0.0.1', () => {
         log('log', `Servidor listo en http://localhost:${PORT}`);
     });
 }

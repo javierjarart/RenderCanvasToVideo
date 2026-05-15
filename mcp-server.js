@@ -44,6 +44,7 @@ async function ensureChrome() {
 }
 
 let currentCustomProjectPath = null;
+let activeRender = { browser: null, ffmpeg: null };
 
 app.use(express.static(path.join(APP_ROOT, 'public')));
 app.use('/proyectos', express.static(path.join(APP_ROOT, 'proyectos')));
@@ -111,14 +112,16 @@ app.post('/api/render', async (req, res) => {
             executablePath = chromeExecutablePath;
         }
 
+        const chromeArgs = [
+            '--disable-dev-shm-usage'
+        ];
+        if (!executablePath || process.env.NODE_ENV === 'development') {
+            chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+        }
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: executablePath || undefined,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage'
-            ],
+            args: chromeArgs,
         });
 
         const page = await browser.newPage();
@@ -171,6 +174,7 @@ app.post('/api/render', async (req, res) => {
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
             '-i', '-', ...codecArgs, outputPath
         ]);
+        activeRender.ffmpeg = ffmpeg;
 
         ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
 
@@ -181,19 +185,23 @@ app.post('/api/render', async (req, res) => {
         });
 
         ffmpeg.on('close', (code) => {
+            activeRender.ffmpeg = null;
             if (ffmpegError) {
                 renderStatus.state = 'error';
                 renderStatus.error = ffmpegError;
-                browser.close().catch(() => {});
+                browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                activeRender.browser = null;
                 return;
             }
             if (code !== 0) {
                 renderStatus.state = 'error';
                 renderStatus.error = `ffmpeg terminó con código ${code}`;
-                browser.close().catch(() => {});
+                browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                activeRender.browser = null;
                 return;
             }
-            browser.close().catch(() => {});
+            browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+            activeRender.browser = null;
             renderStatus.state = 'done';
             renderStatus.fileUrl = `/renders/${fileName}`;
         });
@@ -236,6 +244,8 @@ app.post('/api/render', async (req, res) => {
         process.stderr.write(err.stack + '\n');
         renderStatus.state = 'error';
         renderStatus.error = err.message;
+        if (activeRender.browser) { activeRender.browser.close().catch(() => {}); activeRender.browser = null; }
+        if (activeRender.ffmpeg) { activeRender.ffmpeg.kill(); activeRender.ffmpeg = null; }
     }
 });
 
@@ -257,7 +267,7 @@ async function main() {
 
     const mcp = new McpServer({
         name: 'RenderCanvasToVideo',
-        version: '0.1.0'
+        version: '0.1.1'
     });
 
     mcp.tool('list_projects',
@@ -381,12 +391,16 @@ async function main() {
             file: z.string().describe('Relative file path inside the project (e.g. script.js or style.css)')
         },
         async (args) => {
-            const filePath = path.join(APP_ROOT, 'proyectos', args.project, args.file);
-            if (!fs.existsSync(filePath)) {
-                return { content: [{ type: 'text', text: `File not found: ${args.project}/${args.file}` }], isError: true };
+            try {
+                const filePath = resolveSafe(APP_ROOT, 'proyectos', args.project, args.file);
+                if (!fs.existsSync(filePath)) {
+                    return { content: [{ type: 'text', text: `File not found: ${args.project}/${args.file}` }], isError: true };
+                }
+                const content = fs.readFileSync(filePath, 'utf-8');
+                return { content: [{ type: 'text', text: content }] };
+            } catch (e) {
+                return { content: [{ type: 'text', text: e.message }], isError: true };
             }
-            const content = fs.readFileSync(filePath, 'utf-8');
-            return { content: [{ type: 'text', text: content }] };
         }
     );
 
@@ -422,6 +436,8 @@ async function main() {
             if (renderStatus.state !== 'rendering') {
                 return { content: [{ type: 'text', text: 'No render is currently running.' }] };
             }
+            if (activeRender.ffmpeg) { activeRender.ffmpeg.kill('SIGKILL'); activeRender.ffmpeg = null; }
+            if (activeRender.browser) { activeRender.browser.close().catch(() => {}); activeRender.browser = null; }
             renderStatus = { state: 'idle', progress: 0, total: 0, fileUrl: null, error: 'Cancelled by user' };
             return { content: [{ type: 'text', text: JSON.stringify({ message: 'Render cancelled' }) }] };
         }
@@ -442,10 +458,14 @@ async function main() {
                 return { content: [{ type: 'text', text: 'Chrome is not ready yet. Try again shortly.' }], isError: true };
             }
             try {
+                const chromeArgs = ['--disable-dev-shm-usage'];
+                if (process.env.NODE_ENV === 'development') {
+                    chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+                }
                 const browser = await puppeteer.launch({
                     headless: true,
                     executablePath: chromeExecutablePath,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+                    args: chromeArgs,
                 });
                 const page = await browser.newPage();
                 await page.setViewport({ width: parseInt(args.width) || 640, height: parseInt(args.height) || 360 });
@@ -584,7 +604,12 @@ async function main() {
             }
             const created = [];
             for (const file of args.files) {
-                const filePath = path.join(projectDir, file.path);
+                let filePath;
+                try {
+                    filePath = resolveSafe(projectDir, file.path);
+                } catch (e) {
+                    return { content: [{ type: 'text', text: e.message }], isError: true };
+                }
                 const dir = path.dirname(filePath);
                 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
                 fs.writeFileSync(filePath, file.content, 'utf-8');
@@ -609,9 +634,12 @@ async function main() {
             fileName: z.string().describe('Name of the video file from get_output_files (e.g. Render_test-anim_1234.mp4)'),
         },
         async (args) => {
-            const rendersDir = path.join(APP_ROOT, 'renders');
-            const filePath = path.join(rendersDir, args.fileName);
-
+            let filePath;
+            try {
+                filePath = resolveSafe(APP_ROOT, 'renders', args.fileName);
+            } catch (e) {
+                return { content: [{ type: 'text', text: e.message }], isError: true };
+            }
             if (!fs.existsSync(filePath)) {
                 return {
                     content: [{ type: 'text', text: `File not found: ${args.fileName}` }],
@@ -648,6 +676,14 @@ async function main() {
     process.stderr.write('MCP server connected\n');
 }
 
+function resolveSafe(base, ...paths) {
+    const resolved = path.resolve(base, ...paths);
+    if (!resolved.startsWith(path.resolve(base))) {
+        throw new Error(`Path traversal detected: ${paths.join('/')}`);
+    }
+    return resolved;
+}
+
 function walkDir(dir, files, prefix) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -678,14 +714,16 @@ async function renderLoop(params) {
             executablePath = chromeExecutablePath;
         }
 
+        const chromeArgs = [
+            '--disable-dev-shm-usage'
+        ];
+        if (!executablePath || process.env.NODE_ENV === 'development') {
+            chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+        }
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: executablePath || undefined,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage'
-            ],
+            args: chromeArgs,
         });
 
         const page = await browser.newPage();
@@ -738,6 +776,7 @@ async function renderLoop(params) {
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
             '-i', '-', ...codecArgs2, outputPath
         ]);
+        activeRender.ffmpeg = ffmpeg;
 
         ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
 
@@ -749,21 +788,25 @@ async function renderLoop(params) {
 
         await new Promise((resolve, reject) => {
             ffmpeg.on('close', (code) => {
+                activeRender.ffmpeg = null;
                 if (ffmpegError) {
                     renderStatus.state = 'error';
                     renderStatus.error = ffmpegError;
-                    browser.close().catch(() => {});
+                    browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                    activeRender.browser = null;
                     reject(new Error(ffmpegError));
                     return;
                 }
                 if (code !== 0) {
                     renderStatus.state = 'error';
                     renderStatus.error = `ffmpeg terminó con código ${code}`;
-                    browser.close().catch(() => {});
+                    browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                    activeRender.browser = null;
                     reject(new Error(`ffmpeg terminó con código ${code}`));
                     return;
                 }
-                browser.close().catch(() => {});
+                browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                activeRender.browser = null;
                 renderStatus.state = 'done';
                 renderStatus.fileUrl = `/renders/${fileName}`;
                 resolve();
@@ -812,6 +855,8 @@ async function renderLoop(params) {
         process.stderr.write(err.stack + '\n');
         renderStatus.state = 'error';
         renderStatus.error = err.message;
+        if (activeRender.browser) { activeRender.browser.close().catch(() => {}); activeRender.browser = null; }
+        if (activeRender.ffmpeg) { activeRender.ffmpeg.kill(); activeRender.ffmpeg = null; }
     }
 }
 
