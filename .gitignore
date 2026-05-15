@@ -14,3 +14,7 @@ renderCanvasCLI.json
 /bin
 bin/ffmpeg-dl.*
 bin/ffmpeg_extracted/
+
+# VS Code
+.vscode/
+*.code-workspace
