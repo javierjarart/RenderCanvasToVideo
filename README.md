@@ -11,7 +11,7 @@ Captura frame por frame con Puppeteer + Chromium y las encadena con FFmpeg.
 ## Descarga
 
 **Windows:**  
-[RenderCanvasToVideo.Setup.0.0.3.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/download/v.0.0.3/RenderCanvasToVideo.Setup.0.0.3.exe)
+[RenderCanvasToVideo.Setup.0.1.0.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/download/V.0.1.0/RenderCanvasToVideo.Setup.0.1.0.exe)
 
 ---
 
