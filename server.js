@@ -163,7 +163,7 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
 
     const vCodec = codec || 'libx264';
@@ -195,7 +195,8 @@ app.post('/api/render', async (req, res) => {
     log('log', `═══ Render iniciado ═══`);
     log('log', `Proyecto: ${projectName}`);
     log('log', `Resolución: ${width}x${height}, FPS: ${fps}, Duración: ${duration}s, Total cuadros: ${totalFrames}`);
-    log('log', `Codec: ${vCodec} | PixFmt: ${vPixFmt} | Container: ${vContainer} | CRF: ${crf || 18}`);
+    const colorProfileStr = [colorPrimaries, colorTrc, colorSpace].filter(Boolean).join('/') || 'none';
+    log('log', `Codec: ${vCodec} | PixFmt: ${vPixFmt} | Container: ${vContainer} | CRF: ${crf || 18} | Color: ${colorProfileStr}`);
     log('log', `Color fondo: ${bgColor}`);
     log('log', `Salida: ${outputPath}`);
 
@@ -319,6 +320,9 @@ app.post('/api/render', async (req, res) => {
                 outputOpts.push(`-${key}`, String(val));
             }
         }
+        if (colorPrimaries) outputOpts.push('-color_primaries', colorPrimaries);
+        if (colorTrc) outputOpts.push('-color_trc', colorTrc);
+        if (colorSpace) outputOpts.push('-colorspace', colorSpace);
 
         const ffCommand = ffmpeg(inputStream)
             .inputOptions(['-f', 'image2pipe', '-vcodec', 'png', '-r', String(fps)])

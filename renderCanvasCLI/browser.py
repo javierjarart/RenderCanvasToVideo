@@ -102,6 +102,9 @@ class BrowserCapture:
         codec = config.get("codec", "libx264")
         container = config.get("container", ".mp4")
         pix_fmt = config.get("pix_fmt", "yuv420p")
+        color_primaries = config.get("color_primaries", "")
+        color_trc = config.get("color_trc", "")
+        color_space = config.get("color_space", "")
         codec_params = config.get("codec_params", {})
 
         total_frames = fps * duration
@@ -121,6 +124,9 @@ class BrowserCapture:
             "codec": codec,
             "container": container,
             "pixFmt": pix_fmt,
+            "colorPrimaries": color_primaries,
+            "colorTrc": color_trc,
+            "colorSpace": color_space,
             "codecParams": codec_params,
         }
         if custom_path:

@@ -23,6 +23,12 @@ const GROUP_LABELS = {
   "cfhd-film-hd": "-- CineForm MOV --",
 };
 
+const COLOR_PROFILES = {
+  "bt709":  { name: "Rec.709",  primaries: "bt709",    trc: "bt709",    space: "bt709" },
+  "bt2020": { name: "Rec.2020", primaries: "bt2020",    trc: "bt2020-10", space: "bt2020nc" },
+  "dcip3":  { name: "DCI-P3",   primaries: "smpte432",  trc: "gamma28",   space: "smpte432" },
+};
+
 let customOutputDir = null;
 let customProjectPath = null;
 
@@ -43,6 +49,17 @@ let customProjectPath = null;
   select.innerHTML = html;
   select.value = 'hd-60';
   applyPreset('hd-60');
+})();
+
+// ─── Poblar color profile dropdown ───────────────────────────────────────────
+(function populateColorProfiles() {
+  const select = document.getElementById('colorProfile');
+  if (!select) return;
+  let html = '';
+  for (const [key, cp] of Object.entries(COLOR_PROFILES)) {
+    html += `<option value="${key}">${cp.name}</option>`;
+  }
+  select.innerHTML = html;
 })();
 
 // ─── Aplicar preset a los campos ─────────────────────────────────────────────
@@ -137,6 +154,8 @@ document.getElementById('renderForm').onsubmit = async (e) => {
 
   const presetKey = document.getElementById('preset').value;
   const preset = PRESETS[presetKey] || {};
+  const colorProfileKey = document.getElementById('colorProfile').value;
+  const colorProfile = COLOR_PROFILES[colorProfileKey] || {};
 
   try {
     const res = await fetch('/api/render', {
@@ -154,6 +173,9 @@ document.getElementById('renderForm').onsubmit = async (e) => {
         container: preset.container || '.mp4',
         pixFmt: preset.pixFmt || 'yuv420p',
         codecParams: preset.codecParams || {},
+        colorPrimaries: colorProfile.primaries || '',
+        colorTrc: colorProfile.trc || '',
+        colorSpace: colorProfile.space || '',
       })
     });
 

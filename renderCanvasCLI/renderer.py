@@ -65,6 +65,9 @@ class Renderer:
         codec = cfg.get("codec", "libx264")
         container = cfg.get("container", ".mp4")
         pix_fmt = cfg.get("pix_fmt", "yuv420p")
+        color_primaries = cfg.get("color_primaries", "")
+        color_trc = cfg.get("color_trc", "")
+        color_space = cfg.get("color_space", "")
         codec_params = cfg.get("codec_params", {})
         filename = f"Render_{project_name}_{timestamp}{container}"
         output_dir = cfg.get("output_dir", "") or os.path.join(self.base_dir, "renders")
@@ -86,6 +89,9 @@ class Renderer:
             "codec": codec,
             "container": container,
             "pix_fmt": pix_fmt,
+            "color_primaries": color_primaries,
+            "color_trc": color_trc,
+            "color_space": color_space,
             "codec_params": codec_params,
             "preset": cfg.get("ffmpeg_preset", cfg.get("preset", "medium")),
         }

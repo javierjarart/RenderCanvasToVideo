@@ -20,6 +20,9 @@ class RenderConfig:
     preset: str = "medium"
     codec: str = "libx264"
     pixel_format: str = "yuv420p"
+    color_primaries: str = ""
+    color_trc: str = ""
+    color_space: str = ""
     project: str = ""
     custom_project_path: str = ""
 

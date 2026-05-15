@@ -90,7 +90,7 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
 
     const vCodec = codec || 'libx264';
@@ -190,6 +190,9 @@ app.post('/api/render', async (req, res) => {
                 codecArgs.push(`-${key}`, String(val));
             }
         }
+        if (colorPrimaries) codecArgs.push('-color_primaries', colorPrimaries);
+        if (colorTrc) codecArgs.push('-color_trc', colorTrc);
+        if (colorSpace) codecArgs.push('-colorspace', colorSpace);
 
         const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
@@ -323,6 +326,9 @@ async function main() {
             pixFmt: z.string().optional().describe('Pixel format (yuv420p, yuv422p)'),
             codecParams: z.record(z.string()).optional().describe('Codec-specific parameters (e.g. {"format":"hap_q"})'),
             crf: z.number().optional().describe('CRF quality for libx264 (0-51, lower=better)'),
+            colorPrimaries: z.string().optional().describe('Color primaries (bt709, bt2020, smpte432)'),
+            colorTrc: z.string().optional().describe('Color transfer characteristics (bt709, bt2020-10, gamma28)'),
+            colorSpace: z.string().optional().describe('Color space (bt709, bt2020nc, smpte432)'),
         },
         async (args) => {
             if (renderStatus.state === 'rendering') {
@@ -332,7 +338,7 @@ async function main() {
                 };
             }
 
-            const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams } = args;
+            const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, colorPrimaries, colorTrc, colorSpace } = args;
             const totalFrames = parseInt(fps) * parseInt(duration);
 
             const vCodec = codec || 'libx264';
@@ -369,7 +375,8 @@ async function main() {
                 project, width, height, fps, duration, bgColor, crf: args.crf,
                 customOutputDir, customProjectPath, totalFrames,
                 projectName, fileName, outputPath,
-                codec: vCodec, container: vContainer, pixFmt: vPixFmt, codecParams: vCodecParams
+                codec: vCodec, container: vContainer, pixFmt: vPixFmt, codecParams: vCodecParams,
+                colorPrimaries, colorTrc, colorSpace
             }).catch(err => {
                 process.stderr.write(err.stack + '\n');
                 renderStatus.state = 'error';
@@ -735,7 +742,7 @@ function walkDir(dir, files, prefix) {
 }
 
 async function renderLoop(params) {
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, totalFrames, fileName, outputPath, codec, container, pixFmt, codecParams, crf } = params;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, totalFrames, fileName, outputPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = params;
 
     try {
         let executablePath = null;
@@ -808,6 +815,9 @@ async function renderLoop(params) {
                 codecArgs2.push(`-${key}`, String(val));
             }
         }
+        if (colorPrimaries) codecArgs2.push('-color_primaries', colorPrimaries);
+        if (colorTrc) codecArgs2.push('-color_trc', colorTrc);
+        if (colorSpace) codecArgs2.push('-colorspace', colorSpace);
 
         const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),

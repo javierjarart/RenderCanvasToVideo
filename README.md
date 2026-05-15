@@ -3,7 +3,7 @@
 Convierte animaciones HTML5 Canvas a video MP4/MOV.  
 Captura frame por frame con Puppeteer + Chromium y las encadena con FFmpeg.
 
-[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 ---
@@ -12,6 +12,7 @@ Captura frame por frame con Puppeteer + Chromium y las encadena con FFmpeg.
 
 - **🎨 Renderiza cualquier `<canvas>`** — Proyectos locales o cualquier carpeta con `index.html` + canvas
 - **🎬 Múltiples códecs profesionales** — H.264, HAP (Q/Alpha), CineForm (CFHD)
+- **🎨 Perfiles de color** — Rec.709, Rec.2020 y DCI-P3 con metadatos FFmpeg incrustados
 - **🖥️ App de escritorio** — Interfaz gráfica nativa con selectores de carpeta y progreso en tiempo real
 - **🐍 CLI Python** — Scripteable, configurable, ideal para pipelines automatizados
 - **🤖 Integración con IA** — Servidor MCP compatible con Claude Desktop, Cursor y otros asistentes
@@ -92,6 +93,18 @@ Documentación completa en [`docs/mcp-server.md`](docs/mcp-server.md).
 
 ---
 
+## Perfiles de color
+
+| Perfil | Primarias | Transferencia | Espacio | Uso típico |
+|--------|-----------|---------------|---------|------------|
+| **Rec.709** | `bt709` | `bt709` | `bt709` | HD TV, YouTube, video estándar |
+| **Rec.2020** | `bt2020` | `bt2020-10` | `bt2020nc` | UHD/4K, HDR |
+| **DCI-P3** | `smpte432` | `gamma28` | `smpte432` | Cine digital, monitores amplio gamut |
+
+Los perfiles de color se seleccionan desde la UI de escritorio o se envían como parámetros en la API. Los metadatos se incrustan en el video via FFmpeg (`-color_primaries`, `-color_trc`, `-colorspace`).
+
+---
+
 ## Uso rápido
 
 ```bash
@@ -110,6 +123,9 @@ python -m renderCanvasCLI render --project mi-animacion --preset 4k-60
 # Renderizar con codec profesional
 python -m renderCanvasCLI render --project mi-animacion --preset hap-q-hd
 python -m renderCanvasCLI render --project mi-animacion --preset cfhd-film-4k
+
+# Renderizar con perfil de color
+python -m renderCanvasCLI render --project mi-animacion --preset hd-60 --color-primaries bt2020 --color-trc bt2020-10 --color-space bt2020nc
 
 # Sobrescribir parámetros individuales
 python -m renderCanvasCLI render --project mi-animacion --codec cfhd --pix-fmt yuv422p --container .mov
