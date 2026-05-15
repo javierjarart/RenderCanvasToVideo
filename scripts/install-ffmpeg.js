@@ -153,6 +153,9 @@ function extractZip(src, destDir, innerPath) {
       extract: 'zip',
     },
     macos: {
+      // EXPERIMENTAL: soporte para macOS mediante builds de evermeet.cx.
+      // La disponibilidad del encoder HAP puede variar. Si se necesita HAP,
+      // instalar ffmpeg via homebrew: brew install ffmpeg
       url: 'https://evermeet.cx/ffmpeg/ffmpeg-8.1.1.zip',
       innerPath: 'ffmpeg',
       extract: 'zip',
