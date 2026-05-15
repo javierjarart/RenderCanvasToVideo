@@ -6,7 +6,7 @@ Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con 
 
 Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 
-| | Grabación directa | **Canvas to Video** |
+| | Grabación directa | **RenderCanvasToVideo** |
 |---|---|---|
 | FPS | Limitado al hardware real (30–60 fps) | Cualquier FPS (15, 60, 120…) |
 | Duración | 1 min de video = 1 min real | Renderizado fuera de tiempo real |
