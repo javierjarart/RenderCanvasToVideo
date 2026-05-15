@@ -257,7 +257,7 @@ async function main() {
 
     const mcp = new McpServer({
         name: 'RenderCanvasToVideo',
-        version: '1.0.0'
+        version: '0.1.0'
     });
 
     mcp.tool('list_projects',

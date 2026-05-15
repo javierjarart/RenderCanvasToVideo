@@ -9,6 +9,7 @@ const { PassThrough } = require('stream');
 function resolveFfmpegPath() {
     const isWin = process.platform === 'win32';
     const binaryName = isWin ? 'ffmpeg.exe' : 'ffmpeg';
+    if (process.env.FFMPEG_PATH && fs.existsSync(process.env.FFMPEG_PATH)) return process.env.FFMPEG_PATH;
     const bundled = path.join(APP_ROOT, 'bin', binaryName);
     if (fs.existsSync(bundled)) return bundled;
     if (ffmpegPath && fs.existsSync(ffmpegPath)) return ffmpegPath;

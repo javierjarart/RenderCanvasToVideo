@@ -155,7 +155,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "codec": "cfhd",
         "container": ".mov",
         "pix_fmt": "yuv422p",
-        "codec_params": {"quality": "film"},
+        "codec_params": {"quality": "film1"},
         "preset": "medium",
     },
     "cfhd-high-hd": {
@@ -191,7 +191,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "codec": "cfhd",
         "container": ".mov",
         "pix_fmt": "yuv422p",
-        "codec_params": {"quality": "film"},
+        "codec_params": {"quality": "film1"},
         "preset": "medium",
     },
 }
