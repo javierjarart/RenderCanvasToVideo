@@ -65,7 +65,7 @@ Documentación completa en [`docs/mcp-server.md`](docs/mcp-server.md).
 
 ---
 
-## Presets de renderizado
+## Presets 
 
 ### H.264 (MP4)
 
