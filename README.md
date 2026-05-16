@@ -4,8 +4,8 @@
 
 Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
 
+<img width="901" height="466" alt="screenshot 4" src="https://github.com/user-attachments/assets/a4e67095-7dc4-400a-a8ee-2856b430a681" />
 
-<img width="903" height="468" alt="screenshot 4" src="https://github.com/user-attachments/assets/33c97e97-658f-49ec-9a37-a3eadff33ce9" />
 
 ## ¿Por qué?
 
