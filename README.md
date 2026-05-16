@@ -24,7 +24,7 @@ Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 ---
 
 ** Descarga Para Windows:**  
-[RenderCanvasToVideo.Setup.0.2.1.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/download/v.0.2.2/RenderCanvasToVideo.Setup.0.2.2.exe)
+[RenderCanvasToVideo.Setup.0.2.2.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/download/v.0.2.2/RenderCanvasToVideo.Setup.0.2.2.exe)
 
 ---
 
