@@ -15,13 +15,6 @@ Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 | Determinismo | Latencia variable por vsync/drivers | Cada frame es exacto y reproducible |
 | Compatibilidad | No captura 60 fps en pantalla de 30 Hz | Independiente del hardware |
 
-## Características
-
-- **Cualquier FPS** — renderiza a 15, 60, 120 o cualquier tasa arbitraria
-- **Lectura directa del buffer** — accede al canvas puro, sin interferencias del sistema operativo
-- **Resoluciones arbitrarias** — incluso 4K/8K desde un monitor HD
-- **Frames deterministas** — intervalo de tiempo exacto entre cada frame
-- **Independencia de hardware** — simula cualquier tasa de frames sin importar el dispositivo
 
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)]()
