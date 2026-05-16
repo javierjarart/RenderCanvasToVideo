@@ -2,7 +2,6 @@
 [![Version](https://img.shields.io/badge/version-0.2.1-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
-<img width="901" height="460" alt="screenshot 3" src="https://github.com/user-attachments/assets/e6b976bf-1fe8-4d44-afa5-59de9b367a98" />
 
 
 Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
