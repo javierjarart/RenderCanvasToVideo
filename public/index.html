@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'">
     <title>Render Canvas To Video</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -20,9 +19,15 @@
                 <span id="selectedDirDisplay" class="path-display flex-1"></span>
             </div>
 
-            <div class="form-group">
-                <label>Codecs / Presets</label>
-                <select id="preset"></select>
+            <div class="row">
+                <div class="form-group flex-1">
+                    <label>Preset de renderizado</label>
+                    <select id="preset"></select>
+                </div>
+                <div class="form-group flex-1">
+                    <label>Perfil de color</label>
+                    <select id="colorProfile"></select>
+                </div>
             </div>
 
             <div class="row">
@@ -73,8 +78,8 @@
         </div>
 
         <div id="logContainer">
-            <div id="logHeader" onclick="toggleLog()">
-                <span>📋 Log  </span>
+            <div id="logHeader" onclick="toggleLog()">      
+                <span>📋 Log de ejecución</span>
                 <span id="logToggle">▼</span>
             </div>
             <div id="logBody">
