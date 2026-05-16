@@ -1,23 +1,38 @@
 # RenderCanvasToVideo
 
-Convierte animaciones HTML5 Canvas a video MP4/MOV.  
-Captura frame por frame con Puppeteer + Chromium y las encadena con FFmpeg.
+Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)]()
+## ¿Por qué?
+
+Los métodos tradicionales de grabación de browser tienen limitaciones severas:
+
+| | Grabación directa | **RenderCanvasToVideo** |
+|---|---|---|
+| FPS | Limitado al hardware real (30–60 fps) | Cualquier FPS (15, 60, 120…) |
+| Duración | 1 min de video = 1 min real | Renderizado fuera de tiempo real |
+| Calidad | Píxeles comprimidos del monitor, con aliasing | Buffer interno del canvas — sin pérdida |
+| Resolución | Ligada a la pantalla física | Cualquier resolución (4K, 8K…) |
+| Determinismo | Latencia variable por vsync/drivers | Cada frame es exacto y reproducible |
+| Compatibilidad | No captura 60 fps en pantalla de 30 Hz | Independiente del hardware |
+
+## Características
+
+- **Cualquier FPS** — renderiza a 15, 60, 120 o cualquier tasa arbitraria
+- **Lectura directa del buffer** — accede al canvas puro, sin interferencias del sistema operativo
+- **Resoluciones arbitrarias** — incluso 4K/8K desde un monitor HD
+- **Frames deterministas** — intervalo de tiempo exacto entre cada frame
+- **Independencia de hardware** — simula cualquier tasa de frames sin importar el dispositivo
+
+
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 ---
 
 ## 🚀 Características
 
-- **🎨 Renderiza cualquier `<canvas>`** — Proyectos locales o cualquier carpeta con `index.html` + canvas
-- **🎬 Múltiples códecs profesionales** — H.264, HAP (Q/Alpha), CineForm (CFHD)
-- **🎨 Perfiles de color** — Rec.709, Rec.2020 y DCI-P3 con metadatos FFmpeg incrustados
-- **🖥️ App de escritorio** — Interfaz gráfica nativa con selectores de carpeta y progreso en tiempo real
-- **🐍 CLI Python** — Scripteable, configurable, ideal para pipelines automatizados
-- **🤖 Integración con IA** — Servidor MCP compatible con Claude Desktop, Cursor y otros asistentes
-- **🔧 Auto-configurable** — Chromium y FFmpeg se descargan automáticamente en primera ejecución
-- **🪟🐧🍎 Multiplataforma** — Windows, Linux, macOS
+**Windows:**  
+[RenderCanvasToVideo.Setup.0.1.0.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/download/V.0.1.0/RenderCanvasToVideo.Setup.0.1.0.exe)
 
 ---
 
