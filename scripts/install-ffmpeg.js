@@ -90,14 +90,30 @@ function extractZip(src, destDir, innerPath) {
   if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true });
   fs.mkdirSync(tmp, { recursive: true });
   try {
-    execSync(`powershell -Command "Expand-Archive -Path '${src}' -DestinationPath '${tmp}'"`, { stdio: 'pipe' });
-    const extracted = path.join(tmp, innerPath);
-    if (!fs.existsSync(extracted)) {
-      execSync(`unzip -o "${src}" -d "${tmp}"`, { stdio: 'pipe' });
+    const isWin = process.platform === 'win32';
+    if (isWin) {
+      execSync(`powershell -Command "Expand-Archive -Path '${src}' -DestinationPath '${tmp}'"`, { stdio: 'pipe' });
+    } else {
+      try {
+        execSync(`unzip -o "${src}" -d "${tmp}"`, { stdio: 'pipe' });
+      } catch {
+        throw new Error(
+          'unzip is not installed. Install it with:\n' +
+          '  Debian/Ubuntu: sudo apt install unzip\n' +
+          '  RHEL/Fedora:   sudo dnf install unzip\n' +
+          '  Arch:          sudo pacman -S unzip\n' +
+          '  macOS:         brew install unzip'
+        );
+      }
     }
-    const extracted2 = path.join(tmp, innerPath);
-    if (!fs.existsSync(extracted2)) throw new Error(`Expected binary not found: ${extracted2}`);
-    return extracted2;
+    // Search for the binary in the extracted files
+    const files = execSync(`find "${tmp}" -type f -name "ffmpeg*"`, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+    for (const f of files) {
+      if (f.endsWith(innerPath.split('/').pop()) || f.endsWith('ffmpeg') || f.endsWith('ffmpeg.exe')) {
+        return f;
+      }
+    }
+    throw new Error(`Cannot find ffmpeg binary in extracted archive`);
   } catch (e) {
     if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true });
     throw e;
@@ -111,9 +127,21 @@ function extractZip(src, destDir, innerPath) {
   if (platform === 'darwin' || platform === 'mac') platform = 'macos';
   if (platform === 'linux') platform = 'linux64';
 
+  const currentOs = process.platform;
+  const isCrossBuild = (
+    (platform === 'win64' && currentOs !== 'win32') ||
+    (platform === 'linux64' && currentOs !== 'linux') ||
+    (platform === 'macos' && currentOs !== 'darwin')
+  );
+  if (isCrossBuild) {
+    console.warn(`⚠ Compilación cruzada: descargando FFmpeg para ${platform} desde ${currentOs}`);
+  }
+
   const root = path.join(__dirname, '..');
   const binDir = path.join(root, 'bin');
   if (!fs.existsSync(binDir)) fs.mkdirSync(binDir, { recursive: true });
+
+  console.log(`Plataforma detectada: ${platform} (arg: ${process.argv[2] || 'auto'})`);
 
   const { binName, arch } = getPlatformInfo(platform);
   const outPath = path.join(binDir, binName);
@@ -153,6 +181,9 @@ function extractZip(src, destDir, innerPath) {
       extract: 'zip',
     },
     macos: {
+      // EXPERIMENTAL: soporte para macOS mediante builds de evermeet.cx.
+      // La disponibilidad del encoder HAP puede variar. Si se necesita HAP,
+      // instalar ffmpeg via homebrew: brew install ffmpeg
       url: 'https://evermeet.cx/ffmpeg/ffmpeg-8.1.1.zip',
       innerPath: 'ffmpeg',
       extract: 'zip',
@@ -185,24 +216,8 @@ function extractZip(src, destDir, innerPath) {
       extractedPath = extractTarXz(archivePath, binDir, src.innerPath);
       fs.copyFileSync(extractedPath, outPath);
     } else if (src.extract === 'zip') {
-      // For zip, try unzip command first (cross-platform)
-      const extDir = path.join(binDir, 'ffmpeg_extracted');
-      if (fs.existsSync(extDir)) fs.rmSync(extDir, { recursive: true });
-      fs.mkdirSync(extDir, { recursive: true });
-      try {
-        execSync(`unzip -o "${archivePath}" -d "${extDir}"`, { stdio: 'pipe' });
-      } catch {
-        execSync(`tar -xf "${archivePath}" -C "${extDir}"`, { stdio: 'pipe' });
-      }
-      extractedPath = path.join(extDir, src.innerPath);
-      if (!fs.existsSync(extractedPath)) {
-        // Search for ffmpeg binary
-        const files = execSync(`find "${extDir}" -name "${binName}" -type f`, { encoding: 'utf8' }).trim().split('\n');
-        if (files.length > 0) extractedPath = files[0];
-        else throw new Error(`Cannot find ${binName} in extracted archive`);
-      }
+      extractedPath = extractZip(archivePath, binDir, src.innerPath);
       fs.copyFileSync(extractedPath, outPath);
-      if (fs.existsSync(extDir)) fs.rmSync(extDir, { recursive: true });
     }
 
     fs.chmodSync(outPath, 0o755);

@@ -15,8 +15,18 @@ function resolveFfmpegPath() {
 }
 const { install, getInstalledBrowsers, resolveBuildId, detectBrowserPlatform, Browser } = require('@puppeteer/browsers');
 
+const ALLOWED_CODEC_PARAMS = new Set(['format', 'quality']);
+
 const app = express();
 app.use(express.json());
+
+app.use((req, res, next) => {
+    res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+    );
+    next();
+});
 
 const APP_ROOT = process.env.APP_ROOT || __dirname;
 const CHROME_CACHE_DIR = process.env.CHROME_CACHE_DIR || path.join(APP_ROOT, '.cache', 'puppeteer');
@@ -44,6 +54,7 @@ async function ensureChrome() {
 }
 
 let currentCustomProjectPath = null;
+let activeRender = { browser: null, ffmpeg: null };
 
 app.use(express.static(path.join(APP_ROOT, 'public')));
 app.use('/proyectos', express.static(path.join(APP_ROOT, 'proyectos')));
@@ -51,7 +62,10 @@ app.use('/renders', express.static(path.join(APP_ROOT, 'renders')));
 
 app.use('/external-project', (req, res, next) => {
     if (currentCustomProjectPath && fs.existsSync(currentCustomProjectPath)) {
-        return express.static(currentCustomProjectPath)(req, res, next);
+        return express.static(currentCustomProjectPath, {
+            dotfiles: 'deny',
+            index: ['index.html'],
+        })(req, res, next);
     }
     res.status(404).send('Proyecto externo no configurado o no encontrado');
 });
@@ -76,7 +90,7 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
 
     const vCodec = codec || 'libx264';
@@ -86,8 +100,14 @@ app.post('/api/render', async (req, res) => {
 
     let projectName = project;
     if (customProjectPath) {
-        currentCustomProjectPath = customProjectPath;
-        projectName = path.basename(customProjectPath);
+        const resolved = path.isAbsolute(customProjectPath)
+            ? path.resolve(customProjectPath)
+            : resolveSafe(APP_ROOT, customProjectPath);
+        if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+            return res.status(400).json({ error: `Ruta de proyecto inválida: ${customProjectPath}` });
+        }
+        currentCustomProjectPath = resolved;
+        projectName = path.basename(resolved);
     }
 
     const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
@@ -111,14 +131,16 @@ app.post('/api/render', async (req, res) => {
             executablePath = chromeExecutablePath;
         }
 
+        const chromeArgs = [
+            '--disable-dev-shm-usage'
+        ];
+        if (!executablePath || process.env.NODE_ENV === 'development') {
+            chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+        }
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: executablePath || undefined,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage'
-            ],
+            args: chromeArgs,
         });
 
         const page = await browser.newPage();
@@ -164,13 +186,19 @@ app.post('/api/render', async (req, res) => {
             codecArgs.push('-crf', String(crf || 18));
         }
         for (const [key, val] of Object.entries(vCodecParams)) {
-            codecArgs.push(`-${key}`, String(val));
+            if (ALLOWED_CODEC_PARAMS.has(key)) {
+                codecArgs.push(`-${key}`, String(val));
+            }
         }
+        if (colorPrimaries) codecArgs.push('-color_primaries', colorPrimaries);
+        if (colorTrc) codecArgs.push('-color_trc', colorTrc);
+        if (colorSpace) codecArgs.push('-colorspace', colorSpace);
 
         const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
             '-i', '-', ...codecArgs, outputPath
         ]);
+        activeRender.ffmpeg = ffmpeg;
 
         ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
 
@@ -181,19 +209,23 @@ app.post('/api/render', async (req, res) => {
         });
 
         ffmpeg.on('close', (code) => {
+            activeRender.ffmpeg = null;
             if (ffmpegError) {
                 renderStatus.state = 'error';
                 renderStatus.error = ffmpegError;
-                browser.close().catch(() => {});
+                browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                activeRender.browser = null;
                 return;
             }
             if (code !== 0) {
                 renderStatus.state = 'error';
                 renderStatus.error = `ffmpeg terminó con código ${code}`;
-                browser.close().catch(() => {});
+                browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                activeRender.browser = null;
                 return;
             }
-            browser.close().catch(() => {});
+            browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+            activeRender.browser = null;
             renderStatus.state = 'done';
             renderStatus.fileUrl = `/renders/${fileName}`;
         });
@@ -236,6 +268,8 @@ app.post('/api/render', async (req, res) => {
         process.stderr.write(err.stack + '\n');
         renderStatus.state = 'error';
         renderStatus.error = err.message;
+        if (activeRender.browser) { activeRender.browser.close().catch(() => {}); activeRender.browser = null; }
+        if (activeRender.ffmpeg) { activeRender.ffmpeg.kill(); activeRender.ffmpeg = null; }
     }
 });
 
@@ -257,7 +291,7 @@ async function main() {
 
     const mcp = new McpServer({
         name: 'RenderCanvasToVideo',
-        version: '0.1.0'
+        version: '0.1.1'
     });
 
     mcp.tool('list_projects',
@@ -292,6 +326,9 @@ async function main() {
             pixFmt: z.string().optional().describe('Pixel format (yuv420p, yuv422p)'),
             codecParams: z.record(z.string()).optional().describe('Codec-specific parameters (e.g. {"format":"hap_q"})'),
             crf: z.number().optional().describe('CRF quality for libx264 (0-51, lower=better)'),
+            colorPrimaries: z.string().optional().describe('Color primaries (bt709, bt2020, smpte432)'),
+            colorTrc: z.string().optional().describe('Color transfer characteristics (bt709, bt2020-10, gamma28)'),
+            colorSpace: z.string().optional().describe('Color space (bt709, bt2020nc, smpte432)'),
         },
         async (args) => {
             if (renderStatus.state === 'rendering') {
@@ -301,7 +338,7 @@ async function main() {
                 };
             }
 
-            const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams } = args;
+            const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, colorPrimaries, colorTrc, colorSpace } = args;
             const totalFrames = parseInt(fps) * parseInt(duration);
 
             const vCodec = codec || 'libx264';
@@ -311,8 +348,17 @@ async function main() {
 
             let projectName = project;
             if (customProjectPath) {
-                currentCustomProjectPath = customProjectPath;
-                projectName = path.basename(customProjectPath);
+                const resolved = path.isAbsolute(customProjectPath)
+                    ? path.resolve(customProjectPath)
+                    : resolveSafe(APP_ROOT, customProjectPath);
+                if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+                    return {
+                        content: [{ type: 'text', text: `Invalid project path: ${customProjectPath}` }],
+                        isError: true
+                    };
+                }
+                currentCustomProjectPath = resolved;
+                projectName = path.basename(resolved);
             }
 
             const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
@@ -329,7 +375,8 @@ async function main() {
                 project, width, height, fps, duration, bgColor, crf: args.crf,
                 customOutputDir, customProjectPath, totalFrames,
                 projectName, fileName, outputPath,
-                codec: vCodec, container: vContainer, pixFmt: vPixFmt, codecParams: vCodecParams
+                codec: vCodec, container: vContainer, pixFmt: vPixFmt, codecParams: vCodecParams,
+                colorPrimaries, colorTrc, colorSpace
             }).catch(err => {
                 process.stderr.write(err.stack + '\n');
                 renderStatus.state = 'error';
@@ -381,12 +428,16 @@ async function main() {
             file: z.string().describe('Relative file path inside the project (e.g. script.js or style.css)')
         },
         async (args) => {
-            const filePath = path.join(APP_ROOT, 'proyectos', args.project, args.file);
-            if (!fs.existsSync(filePath)) {
-                return { content: [{ type: 'text', text: `File not found: ${args.project}/${args.file}` }], isError: true };
+            try {
+                const filePath = resolveSafe(APP_ROOT, 'proyectos', args.project, args.file);
+                if (!fs.existsSync(filePath)) {
+                    return { content: [{ type: 'text', text: `File not found: ${args.project}/${args.file}` }], isError: true };
+                }
+                const content = fs.readFileSync(filePath, 'utf-8');
+                return { content: [{ type: 'text', text: content }] };
+            } catch (e) {
+                return { content: [{ type: 'text', text: e.message }], isError: true };
             }
-            const content = fs.readFileSync(filePath, 'utf-8');
-            return { content: [{ type: 'text', text: content }] };
         }
     );
 
@@ -422,6 +473,8 @@ async function main() {
             if (renderStatus.state !== 'rendering') {
                 return { content: [{ type: 'text', text: 'No render is currently running.' }] };
             }
+            if (activeRender.ffmpeg) { activeRender.ffmpeg.kill('SIGKILL'); activeRender.ffmpeg = null; }
+            if (activeRender.browser) { activeRender.browser.close().catch(() => {}); activeRender.browser = null; }
             renderStatus = { state: 'idle', progress: 0, total: 0, fileUrl: null, error: 'Cancelled by user' };
             return { content: [{ type: 'text', text: JSON.stringify({ message: 'Render cancelled' }) }] };
         }
@@ -442,10 +495,14 @@ async function main() {
                 return { content: [{ type: 'text', text: 'Chrome is not ready yet. Try again shortly.' }], isError: true };
             }
             try {
+                const chromeArgs = ['--disable-dev-shm-usage'];
+                if (process.env.NODE_ENV === 'development') {
+                    chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+                }
                 const browser = await puppeteer.launch({
                     headless: true,
                     executablePath: chromeExecutablePath,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+                    args: chromeArgs,
                 });
                 const page = await browser.newPage();
                 await page.setViewport({ width: parseInt(args.width) || 640, height: parseInt(args.height) || 360 });
@@ -470,7 +527,12 @@ async function main() {
                     loaded = true;
                 } catch (e) {
                     const htmlPath = args.customProjectPath
-                        ? path.join(args.customProjectPath, 'index.html')
+                        ? (() => {
+                            const resolved = path.isAbsolute(args.customProjectPath)
+                                ? path.resolve(args.customProjectPath, 'index.html')
+                                : resolveSafe(APP_ROOT, args.customProjectPath, 'index.html');
+                            return resolved;
+                        })()
                         : path.join(APP_ROOT, 'proyectos', args.project, 'index.html');
                     if (fs.existsSync(htmlPath)) {
                         await page.setContent(fs.readFileSync(htmlPath, 'utf-8'), { waitUntil: 'domcontentloaded', timeout: 10000 });
@@ -584,7 +646,12 @@ async function main() {
             }
             const created = [];
             for (const file of args.files) {
-                const filePath = path.join(projectDir, file.path);
+                let filePath;
+                try {
+                    filePath = resolveSafe(projectDir, file.path);
+                } catch (e) {
+                    return { content: [{ type: 'text', text: e.message }], isError: true };
+                }
                 const dir = path.dirname(filePath);
                 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
                 fs.writeFileSync(filePath, file.content, 'utf-8');
@@ -609,9 +676,12 @@ async function main() {
             fileName: z.string().describe('Name of the video file from get_output_files (e.g. Render_test-anim_1234.mp4)'),
         },
         async (args) => {
-            const rendersDir = path.join(APP_ROOT, 'renders');
-            const filePath = path.join(rendersDir, args.fileName);
-
+            let filePath;
+            try {
+                filePath = resolveSafe(APP_ROOT, 'renders', args.fileName);
+            } catch (e) {
+                return { content: [{ type: 'text', text: e.message }], isError: true };
+            }
             if (!fs.existsSync(filePath)) {
                 return {
                     content: [{ type: 'text', text: `File not found: ${args.fileName}` }],
@@ -648,6 +718,14 @@ async function main() {
     process.stderr.write('MCP server connected\n');
 }
 
+function resolveSafe(base, ...paths) {
+    const resolved = path.resolve(base, ...paths);
+    if (!resolved.startsWith(path.resolve(base))) {
+        throw new Error(`Path traversal detected: ${paths.join('/')}`);
+    }
+    return resolved;
+}
+
 function walkDir(dir, files, prefix) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -664,7 +742,7 @@ function walkDir(dir, files, prefix) {
 }
 
 async function renderLoop(params) {
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, totalFrames, fileName, outputPath, codec, container, pixFmt, codecParams, crf } = params;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, totalFrames, fileName, outputPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = params;
 
     try {
         let executablePath = null;
@@ -678,14 +756,16 @@ async function renderLoop(params) {
             executablePath = chromeExecutablePath;
         }
 
+        const chromeArgs = [
+            '--disable-dev-shm-usage'
+        ];
+        if (!executablePath || process.env.NODE_ENV === 'development') {
+            chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+        }
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: executablePath || undefined,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage'
-            ],
+            args: chromeArgs,
         });
 
         const page = await browser.newPage();
@@ -731,13 +811,19 @@ async function renderLoop(params) {
             codecArgs2.push('-crf', String(crf || 18));
         }
         for (const [key, val] of Object.entries(codecParams || {})) {
-            codecArgs2.push(`-${key}`, String(val));
+            if (ALLOWED_CODEC_PARAMS.has(key)) {
+                codecArgs2.push(`-${key}`, String(val));
+            }
         }
+        if (colorPrimaries) codecArgs2.push('-color_primaries', colorPrimaries);
+        if (colorTrc) codecArgs2.push('-color_trc', colorTrc);
+        if (colorSpace) codecArgs2.push('-colorspace', colorSpace);
 
         const ffmpeg = spawn(resolveFfmpegPath(), [
             '-y', '-f', 'image2pipe', '-vcodec', 'png', '-r', fps.toString(),
             '-i', '-', ...codecArgs2, outputPath
         ]);
+        activeRender.ffmpeg = ffmpeg;
 
         ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
 
@@ -749,21 +835,25 @@ async function renderLoop(params) {
 
         await new Promise((resolve, reject) => {
             ffmpeg.on('close', (code) => {
+                activeRender.ffmpeg = null;
                 if (ffmpegError) {
                     renderStatus.state = 'error';
                     renderStatus.error = ffmpegError;
-                    browser.close().catch(() => {});
+                    browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                    activeRender.browser = null;
                     reject(new Error(ffmpegError));
                     return;
                 }
                 if (code !== 0) {
                     renderStatus.state = 'error';
                     renderStatus.error = `ffmpeg terminó con código ${code}`;
-                    browser.close().catch(() => {});
+                    browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                    activeRender.browser = null;
                     reject(new Error(`ffmpeg terminó con código ${code}`));
                     return;
                 }
-                browser.close().catch(() => {});
+                browser.close().catch(e => process.stderr.write('Error closing browser: ' + e + '\n'));
+                activeRender.browser = null;
                 renderStatus.state = 'done';
                 renderStatus.fileUrl = `/renders/${fileName}`;
                 resolve();
@@ -812,6 +902,8 @@ async function renderLoop(params) {
         process.stderr.write(err.stack + '\n');
         renderStatus.state = 'error';
         renderStatus.error = err.message;
+        if (activeRender.browser) { activeRender.browser.close().catch(() => {}); activeRender.browser = null; }
+        if (activeRender.ffmpeg) { activeRender.ffmpeg.kill(); activeRender.ffmpeg = null; }
     }
 }
 

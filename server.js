@@ -6,6 +6,14 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
 const { PassThrough } = require('stream');
 
+function resolveSafe(base, ...paths) {
+    const resolved = path.resolve(base, ...paths);
+    if (!resolved.startsWith(path.resolve(base))) {
+        throw new Error(`Path traversal detected: ${paths.join('/')}`);
+    }
+    return resolved;
+}
+
 function resolveFfmpegPath() {
     const isWin = process.platform === 'win32';
     const binaryName = isWin ? 'ffmpeg.exe' : 'ffmpeg';
@@ -17,8 +25,18 @@ function resolveFfmpegPath() {
 }
 const { install, getInstalledBrowsers, resolveBuildId, detectBrowserPlatform, Browser } = require('@puppeteer/browsers');
 
+const ALLOWED_CODEC_PARAMS = new Set(['format', 'quality']);
+
 const app = express();
 app.use(express.json());
+
+app.use((req, res, next) => {
+    res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+    );
+    next();
+});
 
 const APP_ROOT = process.env.APP_ROOT || __dirname;
 const CHROME_CACHE_DIR = process.env.CHROME_CACHE_DIR || path.join(APP_ROOT, '.cache', 'puppeteer');
@@ -60,9 +78,24 @@ let currentCustomProjectPath = null;
 const logBuffer = [];
 const MAX_LOG_LINES = 2000;
 
+function sanitizePath(msg) {
+    if (typeof msg !== 'string') return msg;
+    return msg.split(APP_ROOT).join('<root>');
+}
+
+function sanitizeArgs(args) {
+    return args.map(a => {
+        if (typeof a === 'string') return sanitizePath(a);
+        if (a instanceof Error) return sanitizePath(a.stack || a.message);
+        if (typeof a === 'object') return sanitizePath(JSON.stringify(a, null, 2));
+        return a;
+    });
+}
+
 function captureLog(level, args) {
     const timestamp = new Date().toLocaleTimeString();
-    const message = args.map(a => typeof a === 'object' ? (a instanceof Error ? a.stack || a.message : JSON.stringify(a, null, 2)) : String(a)).join(' ');
+    const sanitized = sanitizeArgs(args);
+    const message = sanitized.map(a => typeof a === 'object' ? (a instanceof Error ? a.stack || a.message : JSON.stringify(a, null, 2)) : String(a)).join(' ');
     logBuffer.push({ timestamp, level, message });
     if (logBuffer.length > MAX_LOG_LINES) logBuffer.splice(0, logBuffer.length - MAX_LOG_LINES);
 }
@@ -92,7 +125,10 @@ app.use('/external-project', (req, res, next) => {
             log('error', `[external-project] Ruta no existe: ${currentCustomProjectPath}`);
             return res.status(404).send(`Ruta no encontrada: ${currentCustomProjectPath}`);
         }
-        return express.static(currentCustomProjectPath)(req, res, next);
+        return express.static(currentCustomProjectPath, {
+            dotfiles: 'deny',
+            index: ['index.html'],
+        })(req, res, next);
     }
     res.status(404).send('Proyecto externo no configurado o no encontrado');
 });
@@ -127,7 +163,7 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
 
     const vCodec = codec || 'libx264';
@@ -137,8 +173,14 @@ app.post('/api/render', async (req, res) => {
 
     let projectName = project;
     if (customProjectPath) {
-        currentCustomProjectPath = customProjectPath;
-        projectName = path.basename(customProjectPath);
+        const resolved = path.isAbsolute(customProjectPath)
+            ? path.resolve(customProjectPath)
+            : resolveSafe(APP_ROOT, customProjectPath);
+        if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+            return res.status(400).json({ error: `Ruta de proyecto inválida: ${customProjectPath}` });
+        }
+        currentCustomProjectPath = resolved;
+        projectName = path.basename(resolved);
     }
 
     const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
@@ -153,7 +195,8 @@ app.post('/api/render', async (req, res) => {
     log('log', `═══ Render iniciado ═══`);
     log('log', `Proyecto: ${projectName}`);
     log('log', `Resolución: ${width}x${height}, FPS: ${fps}, Duración: ${duration}s, Total cuadros: ${totalFrames}`);
-    log('log', `Codec: ${vCodec} | PixFmt: ${vPixFmt} | Container: ${vContainer} | CRF: ${crf || 18}`);
+    const colorProfileStr = [colorPrimaries, colorTrc, colorSpace].filter(Boolean).join('/') || 'none';
+    log('log', `Codec: ${vCodec} | PixFmt: ${vPixFmt} | Container: ${vContainer} | CRF: ${crf || 18} | Color: ${colorProfileStr}`);
     log('log', `Color fondo: ${bgColor}`);
     log('log', `Salida: ${outputPath}`);
 
@@ -179,14 +222,16 @@ app.post('/api/render', async (req, res) => {
 
         log('log', `Lanzando Chromium desde: ${chromeExecutablePath}`);
 
+        const chromeArgs = [
+            '--disable-dev-shm-usage'
+        ];
+        if (!chromeExecutablePath || process.env.NODE_ENV === 'development') {
+            chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+        }
         const browser = await puppeteer.launch({
             headless: true,
             executablePath: chromeExecutablePath,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage'
-            ],
+            args: chromeArgs,
         });
 
         log('log', 'Chromium lanzado correctamente.');
@@ -271,8 +316,13 @@ app.post('/api/render', async (req, res) => {
             outputOpts.push('-crf', String(crf || 18));
         }
         for (const [key, val] of Object.entries(vCodecParams)) {
-            outputOpts.push(`-${key}`, String(val));
+            if (ALLOWED_CODEC_PARAMS.has(key)) {
+                outputOpts.push(`-${key}`, String(val));
+            }
         }
+        if (colorPrimaries) outputOpts.push('-color_primaries', colorPrimaries);
+        if (colorTrc) outputOpts.push('-color_trc', colorTrc);
+        if (colorSpace) outputOpts.push('-colorspace', colorSpace);
 
         const ffCommand = ffmpeg(inputStream)
             .inputOptions(['-f', 'image2pipe', '-vcodec', 'png', '-r', String(fps)])
@@ -289,11 +339,11 @@ app.post('/api/render', async (req, res) => {
                 log('error', `FFmpeg error: ${err.message}`);
                 renderStatus.state = 'error';
                 renderStatus.error = err.message;
-                browser.close().catch(() => {});
+                browser.close().catch(e => log('error', 'Error closing browser:', e.message));
             })
             .on('end', () => {
                 log('log', 'FFmpeg finalizado correctamente.');
-                browser.close().catch(() => {});
+                browser.close().catch(e => log('error', 'Error closing browser:', e.message));
                 renderStatus.state = 'done';
                 renderStatus.fileUrl = `/renders/${fileName}`;
             });
@@ -356,7 +406,7 @@ async function start() {
     } else {
         log('log', `Chromium encontrado en: ${chromeExecutablePath}`);
     }
-    app.listen(PORT, () => {
+    app.listen(PORT, '127.0.0.1', () => {
         log('log', `Servidor listo en http://localhost:${PORT}`);
     });
 }

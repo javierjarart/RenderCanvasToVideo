@@ -11,16 +11,22 @@ const PRESETS = {
   "hap-q-hd":        { name: "HAP_Q HD",         width: 1920, height: 1080, fps: 60, codec: "hap",    container: ".mov", pixFmt: "yuv420p", codecParams: { format: "hap_q" } },
   "hap-q-4k":        { name: "HAP_Q 4K",         width: 3840, height: 2160, fps: 30, codec: "hap",    container: ".mov", pixFmt: "yuv420p", codecParams: { format: "hap_q" } },
   "hap-alpha-hd":    { name: "HAP_Alpha HD",     width: 1920, height: 1080, fps: 60, codec: "hap",    container: ".mov", pixFmt: "yuv420p", codecParams: { format: "hap_alpha" } },
-  "cfhd-film-hd":    { name: "CineForm Film HD", width: 1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film" } },
+  "cfhd-film-hd":    { name: "CineForm Film HD", width: 1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film1" } },
   "cfhd-high-hd":    { name: "CineForm High HD", width: 1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "high" } },
   "cfhd-medium-hd":  { name: "CineForm Medium HD",width:1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "medium" } },
-  "cfhd-film-4k":    { name: "CineForm Film 4K", width: 3840, height: 2160, fps: 30, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film" } },
+  "cfhd-film-4k":    { name: "CineForm Film 4K", width: 3840, height: 2160, fps: 30, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film1" } },
 };
 
 const GROUP_LABELS = {
   "hd-30": "-- H.264 MP4 --",
   "hap-q-hd": "-- HAP MOV --",
   "cfhd-film-hd": "-- CineForm MOV --",
+};
+
+const COLOR_PROFILES = {
+  "bt709":  { name: "Rec.709",  primaries: "bt709",    trc: "bt709",    space: "bt709" },
+  "bt2020": { name: "Rec.2020", primaries: "bt2020",    trc: "bt2020-10", space: "bt2020nc" },
+  "dcip3":  { name: "DCI-P3",   primaries: "smpte432",  trc: "gamma28",   space: "smpte432" },
 };
 
 let customOutputDir = null;
@@ -43,6 +49,17 @@ let customProjectPath = null;
   select.innerHTML = html;
   select.value = 'hd-60';
   applyPreset('hd-60');
+})();
+
+// ─── Poblar color profile dropdown ───────────────────────────────────────────
+(function populateColorProfiles() {
+  const select = document.getElementById('colorProfile');
+  if (!select) return;
+  let html = '';
+  for (const [key, cp] of Object.entries(COLOR_PROFILES)) {
+    html += `<option value="${key}">${cp.name}</option>`;
+  }
+  select.innerHTML = html;
 })();
 
 // ─── Aplicar preset a los campos ─────────────────────────────────────────────
@@ -137,6 +154,8 @@ document.getElementById('renderForm').onsubmit = async (e) => {
 
   const presetKey = document.getElementById('preset').value;
   const preset = PRESETS[presetKey] || {};
+  const colorProfileKey = document.getElementById('colorProfile').value;
+  const colorProfile = COLOR_PROFILES[colorProfileKey] || {};
 
   try {
     const res = await fetch('/api/render', {
@@ -154,6 +173,9 @@ document.getElementById('renderForm').onsubmit = async (e) => {
         container: preset.container || '.mp4',
         pixFmt: preset.pixFmt || 'yuv420p',
         codecParams: preset.codecParams || {},
+        colorPrimaries: colorProfile.primaries || '',
+        colorTrc: colorProfile.trc || '',
+        colorSpace: colorProfile.space || '',
       })
     });
 
@@ -239,7 +261,8 @@ function appendLogs(logs) {
 }
 
 function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return String(str).replace(/[&<>"']/g, c => map[c]);
 }
 
 function startLogPolling() {

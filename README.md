@@ -29,7 +29,7 @@ Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 
 ---
 
-## Descarga
+## 🚀 Características
 
 **Windows:**  
 [RenderCanvasToVideo.Setup.0.1.0.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/download/V.0.1.0/RenderCanvasToVideo.Setup.0.1.0.exe)
@@ -52,8 +52,6 @@ pip install -e .
 python -m renderCanvasCLI --help
 ```
 
-Subcomandos:
-
 | Comando | Descripción |
 |---------|-------------|
 | `render` | Renderiza un proyecto a video |
@@ -75,46 +73,50 @@ Documentación completa en [`docs/mcp-server.md`](docs/mcp-server.md).
 
 ---
 
-## Requisitos
+## Presets de renderizado
 
-- Node.js 18+
-- Python 3.10+
-- Windows, macOS o Linux
+### H.264 (MP4)
+
+| Preset | Resolución | FPS | Uso |
+|--------|-----------|-----|-----|
+| `hd-30` | 1920×1080 | 30 | Calidad estándar |
+| `hd-60` | 1920×1080 | 60 | Calidad fluida |
+| `fullhd-60` | 1920×1080 | 60 | Alta calidad |
+| `4k-30` | 3840×2160 | 30 | 4K estándar |
+| `4k-60` | 3840×2160 | 60 | 4K fluido |
+| `square-1k-30` | 1080×1080 | 30 | Redes sociales |
+| `vertical-hd-30` | 1080×1920 | 30 | Stories/Reels |
+| `preview` | 640×360 | 15 | Borrador rápido |
+| `draft` | 854×480 | 24 | Vista previa |
+
+### HAP (MOV — reproducción en tiempo real)
+
+| Preset | Resolución | FPS | Codec |
+|--------|-----------|-----|-------|
+| `hap-q-hd` | 1920×1080 | 60 | HAP_Q |
+| `hap-q-4k` | 3840×2160 | 30 | HAP_Q |
+| `hap-alpha-hd` | 1920×1080 | 60 | HAP_Alpha |
+
+### CineForm (MOV)
+
+| Preset | Resolución | FPS | Calidad |
+|--------|-----------|-----|---------|
+| `cfhd-film-hd` | 1920×1080 | 60 | Film (máxima) |
+| `cfhd-high-hd` | 1920×1080 | 60 | High |
+| `cfhd-medium-hd` | 1920×1080 | 60 | Medium |
+| `cfhd-film-4k` | 3840×2160 | 30 | Film (máxima) |
 
 ---
 
-## Presets de renderizado
+## Perfiles de color
 
-### H.264 (formato MP4)
+| Perfil | Primarias | Transferencia | Espacio | Uso típico |
+|--------|-----------|---------------|---------|------------|
+| **Rec.709** | `bt709` | `bt709` | `bt709` | HD TV, YouTube, video estándar |
+| **Rec.2020** | `bt2020` | `bt2020-10` | `bt2020nc` | UHD/4K, HDR |
+| **DCI-P3** | `smpte432` | `gamma28` | `smpte432` | Cine digital, monitores amplio gamut |
 
-| Preset | Resolución | FPS | Codec | Uso |
-|--------|-----------|-----|-------|-----|
-| `hd-30` | 1920×1080 | 30 | libx264 | Calidad estándar |
-| `hd-60` | 1920×1080 | 60 | libx264 | Calidad fluida |
-| `fullhd-60` | 1920×1080 | 60 | libx264 | Alta calidad |
-| `4k-30` | 3840×2160 | 30 | libx264 | 4K estándar |
-| `4k-60` | 3840×2160 | 60 | libx264 | 4K fluido |
-| `square-1k-30` | 1080×1080 | 30 | libx264 | Redes sociales |
-| `vertical-hd-30` | 1080×1920 | 30 | libx264 | Stories/Reels |
-| `preview` | 640×360 | 15 | libx264 | Borrador rápido |
-| `draft` | 854×480 | 24 | libx264 | Vista previa |
-
-### HAP (formato MOV — reproducción en tiempo real)
-
-| Preset | Resolución | FPS | Codec | Contenedor |
-|--------|-----------|-----|-------|------------|
-| `hap-q-hd` | 1920×1080 | 60 | HAP_Q | .mov |
-| `hap-q-4k` | 3840×2160 | 30 | HAP_Q | .mov |
-| `hap-alpha-hd` | 1920×1080 | 60 | HAP_Alpha | .mov |
-
-### CineForm (formato MOV)
-
-| Preset | Resolución | FPS | Codec | Calidad | Contenedor |
-|--------|-----------|-----|-------|---------|------------|
-| `cfhd-film-hd` | 1920×1080 | 60 | CineForm | Film (máxima) | .mov |
-| `cfhd-high-hd` | 1920×1080 | 60 | CineForm | High | .mov |
-| `cfhd-medium-hd` | 1920×1080 | 60 | CineForm | Medium | .mov |
-| `cfhd-film-4k` | 3840×2160 | 30 | CineForm | Film (máxima) | .mov |
+Los perfiles de color se seleccionan desde la UI de escritorio o se envían como parámetros en la API. Los metadatos se incrustan en el video via FFmpeg (`-color_primaries`, `-color_trc`, `-colorspace`).
 
 ---
 
@@ -137,21 +139,12 @@ python -m renderCanvasCLI render --project mi-animacion --preset 4k-60
 python -m renderCanvasCLI render --project mi-animacion --preset hap-q-hd
 python -m renderCanvasCLI render --project mi-animacion --preset cfhd-film-4k
 
+# Renderizar con perfil de color
+python -m renderCanvasCLI render --project mi-animacion --preset hd-60 --color-primaries bt2020 --color-trc bt2020-10 --color-space bt2020nc
+
 # Sobrescribir parámetros individuales
 python -m renderCanvasCLI render --project mi-animacion --codec cfhd --pix-fmt yuv422p --container .mov
 ```
-
----
-
-## Compilar distribución
-
-```bash
-npm run dist:win    # Windows (.exe)
-npm run dist:mac    # macOS (.dmg)
-npm run dist:linux  # Linux (.AppImage)
-```
-
-El instalador se genera en `dist/`.
 
 ---
 
@@ -175,7 +168,6 @@ El instalador se genera en `dist/`.
 ├── public/                 # UI de escritorio
 ├── proyectos/              # Animaciones fuente
 ├── renders/                # Videos generados
-├── renderCanvasCLI.json    # Configuración por defecto
 └── docs/mcp-server.md      # Documentación MCP
 ```
 
@@ -183,4 +175,12 @@ El instalador se genera en `dist/`.
 
 ## Licencia
 
-MIT
+MIT — ver [LICENSE](LICENSE).
+
+Este proyecto incluye componentes de terceros con sus propias licencias:
+- **FFmpeg** y **x264** — [GPL-2.0+](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
+- **HAP** — [BSD 2-Clause](https://opensource.org/license/bsd-2-clause)
+- **GoPro CineForm** — código abierto por GoPro, Inc.
+- **H.264/AVC** — sujeto al [AVC Patent Portfolio License](http://www.mpegla.com) para uso personal y no comercial
+
+Ver [NOTICE.md](NOTICE.md) para las atribuciones completas y el aviso de patentes.

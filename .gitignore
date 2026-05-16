@@ -9,4 +9,18 @@ dist/
 __pycache__/
 *.pyc
 renderCanvasCLI.json
+
+# Binarios descargados durante compilación (ffmpeg, etc.)
 /bin
+bin/ffmpeg-dl.*
+bin/ffmpeg_extracted/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Plan de migración
+MIGRATE_DEPS.md
+
+# VS Code extension
+vscode-extension/
