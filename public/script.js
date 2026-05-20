@@ -242,6 +242,8 @@ function toggleLog() {
   if (isOpen) scrollLogToBottom();
 }
 
+document.getElementById('logHeader')?.addEventListener('click', toggleLog);
+
 function scrollLogToBottom() {
   const body = document.getElementById('logBody');
   body.scrollTop = body.scrollHeight;
@@ -273,9 +275,11 @@ function startLogPolling() {
       const data = await res.json();
       if (data.logs && data.logs.length > 0) {
         appendLogs(data.logs);
-        lastLogCount = data.total;
       }
-    } catch (e) {}
+      lastLogCount = data.total;
+    } catch (e) {
+      console.warn('[LogPoller]', e);
+    }
   }, 1000);
 }
 
