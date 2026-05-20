@@ -242,6 +242,8 @@ function toggleLog() {
   if (isOpen) scrollLogToBottom();
 }
 
+document.getElementById('logHeader')?.addEventListener('click', toggleLog);
+
 function scrollLogToBottom() {
   const body = document.getElementById('logBody');
   body.scrollTop = body.scrollHeight;
