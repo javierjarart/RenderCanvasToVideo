@@ -1,5 +1,5 @@
 # RenderCanvasToVideo
-[![Version](https://img.shields.io/badge/version-0.2.2-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.2.3-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
@@ -24,7 +24,7 @@ Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 ---
 
 ** Descarga Para Windows:**  
-[RenderCanvasToVideo.Setup.0.2.2.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/download/v.0.2.2/RenderCanvasToVideo.Setup.0.2.2.exe)
+[RenderCanvasToVideo.Setup.0.2.2.exe](https://github.com/javierjarart/RenderCanvasToVideo/releases/tag/v0.2.3)
 
 ---
 
