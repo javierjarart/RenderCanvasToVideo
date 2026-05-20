@@ -273,9 +273,11 @@ function startLogPolling() {
       const data = await res.json();
       if (data.logs && data.logs.length > 0) {
         appendLogs(data.logs);
-        lastLogCount = data.total;
       }
-    } catch (e) {}
+      lastLogCount = data.total;
+    } catch (e) {
+      console.warn('[LogPoller]', e);
+    }
   }, 1000);
 }
 
