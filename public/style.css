@@ -111,7 +111,7 @@ input:focus, select:focus { border-color: var(--accent); }
 
 button {
   height: 24px; padding: 0 8px; width: 100%;
-  background: #2a2a2a; color: var(--accent); border: 1px solid #3a3a3a;
+  background: #2a2a2a; color: var(--text); border: 1px solid #3a3a3a;
   border-radius: var(--radius-btn);
   font-size: 9px; font-weight: 600;
   cursor: pointer; transition: background 0.15s;
@@ -125,11 +125,14 @@ button:hover { background: #3a3a3a; }
 button:active { transform: translateY(0); }
 button:disabled { background: #1a1a1a; color: #555; border-color: #2a2a2a; cursor: not-allowed; transform: none; }
 
+#btnRender { color: var(--accent); }
+#btnRender span { color: var(--text); }
+
 #bgColor { height: 24px; padding: 2px 4px; cursor: pointer; }
 input[readonly] { color: var(--muted); cursor: default; }
 
 #btnOpenFolder {
-  background: #2a2a2a; color: var(--accent); border: 1px solid #3a3a3a; display: none;
+  background: #2a2a2a; color: var(--text); border: 1px solid #3a3a3a; display: none;
 }
 #btnOpenFolder:hover { background: #3a3a3a; }
 
@@ -147,7 +150,7 @@ input[readonly] { color: var(--muted); cursor: default; }
 #downloadLink {
   display: none; text-align: center;
   height: 28px; line-height: 26px;
-  color: var(--accent); font-weight: 600; text-decoration: none;
+  color: var(--text); font-weight: 600; text-decoration: none;
   border: 1px solid #3a3a3a; padding: 0 6px;
   border-radius: var(--radius-btn); font-size: 9px; text-transform: uppercase;
   box-sizing: border-box; background: #2a2a2a;
