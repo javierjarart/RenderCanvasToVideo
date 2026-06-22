@@ -1,0 +1,37 @@
+{
+  "productName": "RenderCanvasToVideo",
+  "version": "0.2.3",
+  "identifier": "com.javierjarart.rendercanvastovideo",
+  "build": {
+    "beforeDevCommand": "npm run dev:vite",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build:vite",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "RenderCanvasToVideo",
+        "width": 740,
+        "height": 380,
+        "minWidth": 600,
+        "minHeight": 380,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

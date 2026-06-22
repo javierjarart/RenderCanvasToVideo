@@ -1,0 +1,21 @@
+.studio-container {
+  background: var(--panel);
+  padding: 4px 8px 6px;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.credit {
+  position: fixed;
+  bottom: 4px;
+  right: 6px;
+  font-size: 8px;
+  color: #444;
+  user-select: none;
+  pointer-events: none;
+  z-index: 999;
+  filter: grayscale(1);
+  padding: 2px 4px;
+}

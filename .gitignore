@@ -24,3 +24,8 @@ MIGRATE_DEPS.md
 
 # VS Code extension
 vscode-extension/
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
+
