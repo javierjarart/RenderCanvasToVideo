@@ -639,23 +639,25 @@ du -sh src-tauri/target/release/build/* src-tauri/target/release/deps/* 2>/dev/n
 | `public/index.html` | `pre#log-content` → `div#log-content` (pre no acepta hijos div) |
 | `public/app.js` | `openDialog()` ahora usa `window.__TAURI__.dialog?.open()` con fallback a `invoke('plugin:dialog|open', ...)` |
 
-### FFmpeg — detección y bundling
+### FFmpeg — embebido en el binario (single .exe)
 
-**`src-tauri/src/ffmpeg.rs`**: `find_ffmpeg()` busca en este orden:
-1. `<exe_dir>/ffmpeg` (o `ffmpeg.exe`) — binario bundlado junto al ejecutable
-2. `<exe_dir>/../Resources/ffmpeg` — macOS .app bundle
-3. `FFMPEG_PATH` env var
-4. Rutas comunes del sistema (`/usr/bin/ffmpeg`, `C:\ffmpeg\bin\`, etc.)
-5. `which`/`where` como último recurso
+FFmpeg se **embebe dentro del .exe** con `include_bytes!` en tiempo de compilación, y se extrae a `$TMPDIR/RenderCanvasToVideo/ffmpeg` al primer uso. No hay archivos separados que distribuir junto al ejecutable.
 
-Si no encuentra FFmpeg, muestra error con instrucciones de instalación según el SO.
+**Mecanismo (`src-tauri/src/ffmpeg.rs`)**:
+1. `build.rs` detecta si existe `src-tauri/binaries/ffmpeg` (o `ffmpeg.exe`)
+2. Si existe, emite `cfg(ffmpeg_bundled)` y el binario se incrusta via `include_bytes!`
+3. En runtime, `find_ffmpeg()`:
+   - Primero intenta extraer el binario embebido a `{temp_dir}/RenderCanvasToVideo/ffmpeg`
+   - Si no está embebido, busca en PATH rutas comunes del sistema
+   - Como último recurso, `which`/`where`
+4. Si no encuentra FFmpeg, muestra error con instrucciones de instalación según el SO.
 
-**Bundling en CI**: Los workflows descargan FFmpeg estático y lo colocan en `src-tauri/binaries/` **antes** de `npx tauri build`. `tauri.conf.json` incluye `bundle.resources.binaries/*` para embeberlo en instaladores (.deb, .msi, .dmg). También se copia a `target/release/` para la versión portable.
+**CI**: Los workflows descargan FFmpeg estático y lo colocan en `src-tauri/binaries/` **antes** de `cargo build` / `npx tauri build`. El binario se embeberá automáticamente en el .exe.
 
 Fuentes de descarga por plataforma:
 - **Linux**: `johnvansickle.com` (static build)
 - **Windows**: `gyan.dev` (release essentials)
-- **macOS**: `brew install ffmpeg` (`which ffmpeg` si ya existe)
+- **macOS**: `brew install ffmpeg` (no se embeberá a menos que se copie manualmente a `binaries/`)
 
 ### GitHub Actions
 
@@ -673,9 +675,10 @@ Fuentes de descarga por plataforma:
 
 ### Release actual
 
-- Tag: `v0.3.0` (último commit: `b0f62ca`)
-- Estado: en progreso en https://github.com/javierjarart/RenderCanvasToVideo/actions
-- Si falla macOS/Linux, Windows igual se publica por `continue-on-error: true`
+- Tag: `v0.3.0`
+- Binario release: `target/release/rendercanvastovideo` (15MB sin FFmpeg, ~65MB con FFmpeg embebido)
+- FFmpeg embebido via `include_bytes!` → extraído a `$TMPDIR/RenderCanvasToVideo/ffmpeg`
+- Para hacer release: pushear tag `v*` → GitHub Actions construye y publica
 
 ### README
 
@@ -689,5 +692,5 @@ Reescrito para ser amigable al usuario final: menos técnico, más directo, inst
 4. **El MCP se integra**: Cuando se ejecuta con `--mcp`, el binario actúa como servidor MCP sin abrir ventana. Cuando se ejecuta sin argumentos, muestra la UI normal.
 5. **Presets**: Copiar exactamente desde `src/components/RenderForm.tsx` línea 6 a 36 para mantener compatibilidad.
 6. **El diálogo de carpeta**: En vanilla JS se usa `window.__TAURI__.dialog.open()` o `invoke('plugin:dialog|open', ...)`. Consultar documentación de `@tauri-apps/plugin-dialog` para el API exacto sin npm (usando `withGlobalTauri`).
-7. **FFmpeg bundlado**: La app busca `<exe_dir>/ffmpeg` primero. Si no existe, intenta PATH. En CI se descarga automáticamente. Para desarrollo local, instalar FFmpeg en el sistema.
+7. **FFmpeg embebido**: La app extrae el binario de FFmpeg desde dentro del .exe a `$TMPDIR/RenderCanvasToVideo/ffmpeg` al primer uso. Si no está embebido (desarrollo local sin binario en `binaries/`), busca en PATH. En CI se descarga automáticamente antes de compilar y queda incrustado en el .exe.
 8. **Release multiplataforma**: `continue-on-error: true` permite que el release se publique aunque una plataforma falle. Los artifacts se descargan con `merge-multiple: true`.

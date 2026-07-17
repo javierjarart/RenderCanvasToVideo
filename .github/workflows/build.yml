@@ -1,31 +1,17 @@
-name: Build
+name: CI Build
 
 on:
   push:
     branches: [refactor-vanilla, main]
-  workflow_dispatch:
-
-env:
-  CARGO_TERM_COLOR: always
+  pull_request:
+    branches: [main]
 
 jobs:
   build:
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact: RenderCanvasToVideo-linux-x64
-            ext: ''
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact: RenderCanvasToVideo-windows-x64
-            ext: .exe
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact: RenderCanvasToVideo-macos-x64
-            ext: ''
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
 
     runs-on: ${{ matrix.os }}
 
@@ -34,76 +20,67 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '24'
           cache: 'npm'
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
         with:
-          targets: ${{ matrix.target }}
+          path: |
+            target/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
 
       - name: Install Linux system dependencies
-        if: runner.os == 'Linux'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            build-essential \
-            libssl-dev \
-            libayatana-appindicator3-dev \
+            libappindicator3-dev \
             librsvg2-dev \
-            javascriptcoregtk-4.1-dev \
-            libsoup-3.0-dev
+            patchelf \
+            libxdo-dev
 
-      - name: Download FFmpeg (Linux static)
-        if: runner.os == 'Linux'
+      - name: Download FFmpeg (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           mkdir -p src-tauri/binaries
-          wget -qO ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
-          tar -xf ffmpeg.tar.xz
-          cp ffmpeg-git-*-amd64-static/ffmpeg src-tauri/binaries/ffmpeg
+          wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          tar xf ffmpeg-release-amd64-static.tar.xz
+          cp ffmpeg-*-static/ffmpeg src-tauri/binaries/
           chmod +x src-tauri/binaries/ffmpeg
-          rm -rf ffmpeg.tar.xz ffmpeg-git-*-amd64-static
+          rm -rf ffmpeg-*-static ffmpeg-release-amd64-static.tar.xz
 
       - name: Download FFmpeg (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
+        if: matrix.os == 'windows-latest'
         run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/binaries
-          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
-          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg"
-          Copy-Item "ffmpeg/ffmpeg-*/bin/ffmpeg.exe" "src-tauri/binaries/ffmpeg.exe"
-          Remove-Item -Recurse -Force ffmpeg.zip, ffmpeg
+          mkdir src-tauri/binaries -Force
+          curl -L -o ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+          Expand-Archive ffmpeg.zip -DestinationPath .
+          cp ffmpeg-*/bin/ffmpeg.exe src-tauri/binaries/
+          Remove-Item ffmpeg.zip -Force
+          Remove-Item ffmpeg-* -Recurse -Force
 
       - name: Download FFmpeg (macOS)
-        if: runner.os == 'macOS'
+        if: matrix.os == 'macos-latest'
         run: |
+          brew install ffmpeg
           mkdir -p src-tauri/binaries
-          if which ffmpeg >/dev/null 2>&1; then
-            cp "$(which ffmpeg)" src-tauri/binaries/ffmpeg
-          else
-            brew install ffmpeg
-            cp "$(which ffmpeg)" src-tauri/binaries/ffmpeg
-          fi
-          chmod +x src-tauri/binaries/ffmpeg
+          cp "$(which ffmpeg)" src-tauri/binaries/
+
+      - name: Install npm dependencies
+        run: npm ci
 
       - name: Build Tauri app
         run: npx tauri build
 
-      - name: Copy FFmpeg next to standalone binary (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: cp src-tauri/binaries/* target/release/ || true
-
-      - name: Copy FFmpeg next to standalone binary (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Copy-Item "src-tauri/binaries/*" "target/release/" -ErrorAction SilentlyContinue
-
-      - name: Upload bundle
+      - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: bundle-${{ runner.os }}
           path: target/release/bundle/
-          if-no-files-found: warn
+          if-no-files-found: error

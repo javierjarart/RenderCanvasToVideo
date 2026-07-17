@@ -3,177 +3,101 @@ name: Release
 on:
   push:
     tags: ['v*']
-  workflow_dispatch:
-
-env:
-  CARGO_TERM_COLOR: always
-
-permissions:
-  contents: write
 
 jobs:
   build:
+    continue-on-error: true
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            asset_name: RenderCanvasToVideo-linux-x64
-            ext: ''
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            asset_name: RenderCanvasToVideo-windows-x64
-            ext: .exe
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            asset_name: RenderCanvasToVideo-macos-x64
-            ext: ''
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
 
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '24'
           cache: 'npm'
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
         with:
-          targets: ${{ matrix.target }}
+          path: target/
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('src-tauri/Cargo.lock') }}
 
-      - name: Install Linux system dependencies
-        if: runner.os == 'Linux'
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            build-essential \
-            libssl-dev \
-            libayatana-appindicator3-dev \
+            libappindicator3-dev \
             librsvg2-dev \
-            javascriptcoregtk-4.1-dev \
-            libsoup-3.0-dev
+            patchelf \
+            libxdo-dev
 
-      - name: Download FFmpeg (Linux static)
-        if: runner.os == 'Linux'
+      - name: Download FFmpeg (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           mkdir -p src-tauri/binaries
-          wget -qO ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
-          tar -xf ffmpeg.tar.xz
-          cp ffmpeg-git-*-amd64-static/ffmpeg src-tauri/binaries/ffmpeg
+          wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          tar xf ffmpeg-release-amd64-static.tar.xz
+          cp ffmpeg-*-static/ffmpeg src-tauri/binaries/
           chmod +x src-tauri/binaries/ffmpeg
-          rm -rf ffmpeg.tar.xz ffmpeg-git-*-amd64-static
+          rm -rf ffmpeg-*-static ffmpeg-release-amd64-static.tar.xz
 
       - name: Download FFmpeg (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/binaries
-          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
-          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg"
-          Copy-Item "ffmpeg/ffmpeg-*/bin/ffmpeg.exe" "src-tauri/binaries/ffmpeg.exe"
-          Remove-Item -Recurse -Force ffmpeg.zip, ffmpeg
+          mkdir src-tauri/binaries -Force
+          curl -L -o ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+          Expand-Archive ffmpeg.zip -DestinationPath .
+          cp ffmpeg-*/bin/ffmpeg.exe src-tauri/binaries/
+          Remove-Item ffmpeg.zip -Force
+          Get-ChildItem -Directory ffmpeg-* | Remove-Item -Recurse -Force
 
       - name: Download FFmpeg (macOS)
-        if: runner.os == 'macOS'
+        if: matrix.os == 'macos-latest'
         run: |
+          brew install ffmpeg
           mkdir -p src-tauri/binaries
-          if which ffmpeg >/dev/null 2>&1; then
-            cp "$(which ffmpeg)" src-tauri/binaries/ffmpeg
-          else
-            brew install ffmpeg
-            cp "$(which ffmpeg)" src-tauri/binaries/ffmpeg
-          fi
-          chmod +x src-tauri/binaries/ffmpeg
+          cp "$(which ffmpeg)" src-tauri/binaries/
+
+      - name: Install npm dependencies
+        run: npm ci
 
       - name: Build Tauri app
         run: npx tauri build
 
-      - name: Copy FFmpeg next to standalone binary (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: cp src-tauri/binaries/* target/release/ || true
-
-      - name: Copy FFmpeg next to standalone binary (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Copy-Item "src-tauri/binaries/*" "target/release/" -ErrorAction SilentlyContinue
-
-      - name: Package binaries (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          mkdir -p dist
-          cp target/release/rendercanvastovideo dist/${{ matrix.asset_name }}
-          chmod +x dist/${{ matrix.asset_name }}
-          cp target/release/ffmpeg dist/ffmpeg
-          chmod +x dist/ffmpeg
-          cp target/release/bundle/deb/*.deb dist/ 2>/dev/null || true
-          cp target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || true
-
-      - name: Package binaries (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          New-Item -ItemType Directory -Force -Path dist
-          Copy-Item target/release/rendercanvastovideo.exe dist/${{ matrix.asset_name }}.exe
-          Copy-Item target/release/ffmpeg.exe dist/ffmpeg.exe
-          Get-ChildItem target/release/bundle/msi/*.msi -ErrorAction SilentlyContinue | Copy-Item -Destination dist/
-
-      - name: Package binaries (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          mkdir -p dist
-          cp target/release/rendercanvastovideo dist/${{ matrix.asset_name }}
-          chmod +x dist/${{ matrix.asset_name }}
-          cp target/release/ffmpeg dist/ffmpeg
-          chmod +x dist/ffmpeg
-          cp target/release/bundle/dmg/*.dmg dist/ 2>/dev/null || true
-
-      - name: Upload release artifact
+      - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
-          path: dist/
+          name: bundle-${{ runner.os }}
+          path: target/release/bundle/
           if-no-files-found: error
 
   create-release:
-    needs: build
-    if: always()
+    needs: [build]
     runs-on: ubuntu-latest
+    if: always()
+
     steps:
       - uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          pattern: bundle-*
           merge-multiple: true
+          path: bundles/
 
-      - name: Check artifacts
-        run: |
-          echo "Artifacts descargados:"
-          ls -lhR artifacts/ 2>/dev/null || echo "(sin artifacts)"
-          if [ ! -d artifacts ] || [ -z "$(ls -A artifacts 2>/dev/null)" ]; then
-            echo "No hay artifacts para publicar"
-            exit 1
-          fi
-
-      - name: Generate release notes
-        run: |
-          echo "## RenderCanvasToVideo ${{ github.ref_name }}" > release-notes.md
-          echo "" >> release-notes.md
-          echo "Descarga el archivo correspondiente a tu plataforma:" >> release-notes.md
-          echo "" >> release-notes.md
-          for file in artifacts/*; do
-            name=$(basename "$file")
-            echo "- \`$name\`" >> release-notes.md
-          done
-
-      - name: Create release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: release-notes.md
-          files: artifacts/*
-          generate_release_notes: false
+          files: bundles/**/*
+          generate_release_notes: true
+          fail_on_unmatched_files: false
