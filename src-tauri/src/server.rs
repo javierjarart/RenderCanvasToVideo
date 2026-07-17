@@ -11,9 +11,11 @@ pub struct ProjectServer {
 impl ProjectServer {
     pub fn start(
         project_path: &str,
+        entry_point: Option<&str>,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let path = project_path.to_string();
+        let entry = entry_point.unwrap_or("index.html").to_string();
 
         let server = tiny_http::Server::http("127.0.0.1:0")?;
         let port = server.server_addr().to_ip().unwrap().port();
@@ -28,7 +30,7 @@ impl ProjectServer {
                     Ok(Some(request)) => {
                         let url = request.url().to_string();
                         let file_path = if url == "/" {
-                            format!("{}/index.html", path)
+                            format!("{}/{}", path, entry)
                         } else {
                             let decoded = url_decode(&url);
                             format!("{}{}", path, decoded)

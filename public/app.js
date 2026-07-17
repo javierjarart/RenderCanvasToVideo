@@ -56,6 +56,7 @@ const STATUS_CONFIG = {
 
 const state = {
   projectPath: null,
+  projectEntry: null,
   logs: [],
   totalLogs: 0,
   jobs: [],
@@ -69,7 +70,8 @@ const $ = (id) => document.getElementById(id);
 
 const renderForm = $('render-form');
 const btnSelectFolder = $('btn-select-folder');
-const folderName = $('folder-name');
+const btnSelectFile = $('btn-select-file');
+const projectPathEl = $('project-path');
 const presetSelect = $('preset-select');
 const colorProfileSelect = $('color-profile-select');
 const inputWidth = $('input-width');
@@ -146,11 +148,32 @@ btnSelectFolder.addEventListener('click', async () => {
     });
     if (selected) {
       const name = selected.split('/').pop() || selected.split('\\').pop() || 'proyecto';
-      folderName.textContent = '📁 ' + name;
+      projectPathEl.textContent = '📁 ' + name;
       state.projectPath = selected;
+      state.projectEntry = null;
     }
   } catch (err) {
     alert('Error al seleccionar carpeta: ' + err);
+  }
+});
+
+btnSelectFile.addEventListener('click', async () => {
+  try {
+    const selected = await window.__TAURI__.dialog.open({
+      multiple: false,
+      title: 'Selecciona el archivo HTML del proyecto',
+      filters: [{ name: 'HTML', extensions: ['html', 'htm'] }],
+    });
+    if (selected) {
+      const name = selected.split('/').pop() || selected.split('\\').pop() || 'proyecto';
+      const parent = selected.substring(0, selected.lastIndexOf('/')) ||
+                     selected.substring(0, selected.lastIndexOf('\\')) || '';
+      projectPathEl.textContent = '📄 ' + name + '  (' + (parent.split('/').pop() || parent.split('\\').pop() || parent) + ')';
+      state.projectPath = parent;
+      state.projectEntry = name;
+    }
+  } catch (err) {
+    alert('Error al seleccionar archivo: ' + err);
   }
 });
 
@@ -196,6 +219,7 @@ renderForm.addEventListener('submit', async (e) => {
     canvasSelector: inputCanvasSelector.value || undefined,
     filters: inputFilters.value || undefined,
     hwaccel: selectHwaccel.value || undefined,
+    projectEntry: state.projectEntry || undefined,
   };
 
   try {

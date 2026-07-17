@@ -74,6 +74,7 @@ impl QueueProcessor {
         let canvas_selector = params.canvas_selector.clone().unwrap_or_default();
         let filters = params.filters.clone().unwrap_or_default();
         let hwaccel = params.hwaccel.clone();
+        let entry_point = params.project_entry.clone();
 
         let renders_dir = std::env::current_dir()
             .map(|p| p.join("renders").to_string_lossy().to_string())
@@ -96,6 +97,9 @@ impl QueueProcessor {
             if !filters.is_empty() {
                 s.add_log("log", format!("Filtros: {}", filters));
             }
+            if let Some(ref ep) = entry_point {
+                s.add_log("log", format!("Entry: {}", ep));
+            }
             if let Some(ref hw) = hwaccel {
                 if !hw.is_empty() {
                     s.add_log("log", format!("HW Accel: {}", hw));
@@ -110,7 +114,7 @@ impl QueueProcessor {
         }
 
         let server_shutdown = Arc::new(AtomicBool::new(false));
-        let project_port = match ProjectServer::start(&project_path, server_shutdown.clone()) {
+        let project_port = match ProjectServer::start(&project_path, entry_point.as_deref(), server_shutdown.clone()) {
             Ok(server) => {
                 let mut s = state.lock().map_err(|e| e.to_string())?;
                 s.add_log("log", format!("Servidor de proyecto iniciado en puerto {}", server.port));

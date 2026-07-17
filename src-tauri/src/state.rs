@@ -51,6 +51,7 @@ pub struct RenderParams {
     pub canvas_selector: Option<String>,
     pub filters: Option<String>,
     pub hwaccel: Option<String>,
+    pub project_entry: Option<String>,
 }
 
 pub struct ActiveJob {

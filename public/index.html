@@ -13,9 +13,12 @@
       <form id="render-form">
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Carpeta del proyecto</label>
-            <button type="button" id="btn-select-folder" class="btn-select-folder">📁 Seleccionar carpeta</button>
-            <div id="folder-name" class="folder-name"></div>
+            <label class="form-label">Archivo o carpeta del proyecto</label>
+            <div class="folder-select-group">
+              <button type="button" id="btn-select-folder" class="btn-select-folder">📁 Carpeta</button>
+              <button type="button" id="btn-select-file" class="btn-select-folder">📄 Archivo</button>
+            </div>
+            <div id="project-path" class="folder-name"></div>
           </div>
         </div>
 

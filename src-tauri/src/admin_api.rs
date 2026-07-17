@@ -530,6 +530,7 @@ fn mcp_render_canvas(app: &AppHandle, args: &Value) -> ToolResult {
         canvas_selector: args.get("canvasSelector").and_then(|v| v.as_str()).map(|s| s.to_string()),
         filters: None,
         hwaccel: None,
+        project_entry: args.get("projectEntry").and_then(|v| v.as_str()).map(|s| s.to_string()),
     };
 
     let job_id = with_state(app, |s| {
