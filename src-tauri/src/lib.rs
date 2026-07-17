@@ -111,7 +111,6 @@ fn finalize_render(
         name = job.info.project_name.clone();
         cancelled = job.cancel_flag.load(Ordering::SeqCst);
 
-        // signal server shutdown
         if let Some(ref shutdown) = job.server_shutdown {
             shutdown.store(true, Ordering::SeqCst);
         }
@@ -167,7 +166,6 @@ fn cancel_render(
             return Err("El job no está en proceso.".into());
         }
         name = job.info.project_name.clone();
-        // signal server shutdown
         if let Some(ref shutdown) = job.server_shutdown {
             shutdown.store(true, Ordering::SeqCst);
         }
@@ -235,8 +233,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error al ejecutar la aplicación Tauri");
 
-    QueueProcessor::start(app.handle().clone());
-    admin_api::start(app.handle().clone());
+    let handle = app.handle().clone();
+
+    if std::env::args().any(|a| a == "--mcp") {
+        admin_api::start_mcp(handle);
+    } else {
+        QueueProcessor::start(handle.clone());
+        admin_api::start_http(handle.clone());
+    }
 
     app.run(|_app_handle, _event| {});
 }

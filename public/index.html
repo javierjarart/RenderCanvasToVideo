@@ -1,110 +1,113 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Render Canvas To Video</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self';">
+  <title>RenderCanvasToVideo</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
+  <div id="root">
     <div class="studio-container">
-        <h1></h1>
-        <form id="renderForm">
-            <div class="row">
-                <div class="form-group flex-1" id="dropZone">
-                    <label>Archivo del proyecto</label>
-                    <button type="button" id="btnUploadFile" style="width:100%;">📄 Subir archivo</button>
-                    <input type="file" id="fileInputFile" accept=".html" hidden>
-                    <div id="dropOverlay">Suelta el archivo aquí</div>
-                </div>
-                <div class="form-group flex-1" style="justify-content:flex-end;">
-                    <span id="selectedProjectDirDisplay" class="path-display"></span>
-                </div>
-            </div>
-            <div class="row">
-                <div class="form-group flex-1">
-                    <label>Presets</label>
-                    <select id="preset"></select>
-                </div>
-                <div class="form-group flex-1">
-                    <label>Perfil de color</label>
-                    <select id="colorProfile"></select>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="form-group flex-1">
-                    <label>Ancho (px)</label>
-                    <input type="number" id="width" required>
-                </div>
-                <div class="form-group flex-1">
-                    <label>Alto (px)</label>
-                    <input type="number" id="height" required>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="form-group flex-1">
-                    <label>FPS</label>
-                    <input type="number" id="fps" required>
-                </div>
-                <div class="form-group flex-1">
-                    <label>Duración (seg)</label>
-                    <input type="number" id="duration" value="10" required>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="form-group flex-1">
-                    <label>Color de fondo</label>
-                    <input type="color" id="bgColor" value="#000000">
-                </div>
-                <div class="form-group flex-1">
-                    <label>Códec / Salida</label>
-                    <input type="text" id="codecInfo" readonly>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="form-group flex-1">
-                    <label>Selector de Canvas</label>
-                    <select id="canvasSelector">
-                        <option value="">Primer &lt;canvas&gt;</option>
-                    </select>
-                </div>
-                <div class="form-group flex-1">
-                    <label></label>
-                    <span class="hint">Selectores detectados en el proyecto</span>
-                </div>
-            </div>
-
-            <button type="submit" id="btnRender">▶ <span>Iniciar Render</span></button>
-        </form>
-
-        <div class="progress-box" id="progressBox">
-            <div id="statusText">Renderizando: 0%</div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <div class="inline-row mt-10">
-                <a id="downloadLink" href="#" download class="flex-1">⬇ Guardar Como</a>
-                <button id="btnStopRender" class="flex-1" style="display:none;">⏹ Detener render</button>
-            </div>
+      <form id="render-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Carpeta del proyecto</label>
+            <button type="button" id="btn-select-folder" class="btn-select-folder">📁 Seleccionar carpeta</button>
+            <div id="folder-name" class="folder-name"></div>
+          </div>
         </div>
 
-        <div id="logContainer">
-            <div id="logHeader">      
-                <span>📋 Log</span>
-                <span id="logToggle">▼</span>
-            </div>
-            <div id="logBody">
-                <div id="logContent"></div>
-            </div>
+        <div class="form-row">
+          <div class="form-group flex1">
+            <label class="form-label">Presets</label>
+            <select id="preset-select" class="form-select"></select>
+          </div>
+          <div class="form-group flex1">
+            <label class="form-label">Perfil de color</label>
+            <select id="color-profile-select" class="form-select"></select>
+          </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-group flex1">
+            <label class="form-label">Ancho (px)</label>
+            <input type="number" id="input-width" class="form-input" required>
+          </div>
+          <div class="form-group flex1">
+            <label class="form-label">Alto (px)</label>
+            <input type="number" id="input-height" class="form-input" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex1">
+            <label class="form-label">FPS</label>
+            <input type="number" id="input-fps" class="form-input" required>
+          </div>
+          <div class="form-group flex1">
+            <label class="form-label">Duración (seg)</label>
+            <input type="number" id="input-duration" class="form-input" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex1">
+            <label class="form-label">Color de fondo</label>
+            <input type="color" id="input-bg-color" class="form-input form-input-color" value="#000000">
+          </div>
+          <div class="form-group flex1">
+            <label class="form-label">Códec / Salida</label>
+            <input type="text" id="codec-info" class="codec-info" readonly>
+          </div>
+        </div>
+
+        <div id="advanced-toggle" class="advanced-toggle">▼ Opciones avanzadas</div>
+        <div id="advanced-options" class="advanced-options" style="display:none">
+          <div class="form-row">
+            <div class="form-group flex1">
+              <label class="form-label">Filtros FFmpeg (-vf)</label>
+              <input type="text" id="input-filters" class="form-input" placeholder="eq. scale=1280:720,format=nv12">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex1">
+              <label class="form-label">Aceleración HW</label>
+              <select id="select-hwaccel" class="form-select">
+                <option value="">Ninguna (CPU)</option>
+                <option value="cuda">CUDA (NVIDIA)</option>
+                <option value="vaapi">VAAPI (Linux)</option>
+                <option value="videotoolbox">VideoToolbox (macOS)</option>
+                <option value="dxva2">DXVA2 (Windows)</option>
+                <option value="qsv">QSV (Intel)</option>
+              </select>
+            </div>
+            <div class="form-group flex1">
+              <label class="form-label">Selector canvas</label>
+              <input type="text" id="input-canvas-selector" class="form-input" placeholder="canvas (default)">
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-submit" class="btn-submit">▶ Añadir a cola</button>
+      </form>
+
+      <div id="progress-section" class="progress-section" style="display:none"></div>
+
+      <div id="log-container" class="log-container">
+        <div id="log-header" class="log-header">
+          <span>📋 Log</span>
+          <span id="log-toggle">▼</span>
+        </div>
+        <div id="log-body" class="log-body" style="display:none">
+          <pre id="log-content" class="log-content"></pre>
+        </div>
+      </div>
+
+      <div class="credit">📷 @javier.jarart</div>
     </div>
-
-    <div class="credit">📷 @javier.jarart</div>
-
-    <script src="script.js"></script>
+  </div>
+  <script src="app.js"></script>
 </body>
 </html>

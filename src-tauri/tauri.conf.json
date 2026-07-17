@@ -3,12 +3,11 @@
   "version": "0.2.3",
   "identifier": "com.javierjarart.rendercanvastovideo",
   "build": {
-    "beforeDevCommand": "npm run dev:vite",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build:vite",
-    "frontendDist": "../dist"
+    "frontendDist": "../public",
+    "removeUnusedCommands": true
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "RenderCanvasToVideo",
