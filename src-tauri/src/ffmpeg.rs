@@ -1,10 +1,57 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 pub struct FfmpegProcess {
     process: std::process::Child,
     stderr_output: Option<Vec<u8>>,
+}
+
+fn find_ffmpeg() -> Option<PathBuf> {
+    if let Ok(candidates) = std::env::var("FFMPEG_PATH") {
+        let p = PathBuf::from(&candidates);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+
+    let common = if cfg!(target_os = "windows") {
+        vec![
+            "ffmpeg.exe",
+            "C:\\ffmpeg\\bin\\ffmpeg.exe",
+            "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
+            "C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe",
+        ]
+    } else {
+        vec![
+            "ffmpeg",
+            "/usr/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+            "/opt/homebrew/bin/ffmpeg",
+        ]
+    };
+
+    for p in common {
+        let path = PathBuf::from(p);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+
+    // Try `which` / `where` as last resort
+    let which = if cfg!(target_os = "windows") { "where" } else { "which" };
+    if let Ok(out) = Command::new(which).arg("ffmpeg").output() {
+        if out.status.success() {
+            let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let path = PathBuf::from(p);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+
+    None
 }
 
 impl FfmpegProcess {
@@ -17,8 +64,22 @@ impl FfmpegProcess {
         pix_fmt: &str,
         extra_args: &[String],
         hwaccel: Option<&str>,
-    ) -> Result<Self> {
-        let mut cmd = Command::new("ffmpeg");
+    ) -> std::result::Result<Self, String> {
+        let ffmpeg = find_ffmpeg().ok_or_else(|| {
+            let os = std::env::consts::OS;
+            let install = match os {
+                "linux" => "sudo apt install ffmpeg  # o el gestor de paquetes de tu distro",
+                "macos" => "brew install ffmpeg",
+                "windows" => "descarga ffmpeg desde https://ffmpeg.org/download.html y añádelo al PATH",
+                _ => "instala ffmpeg desde https://ffmpeg.org/download.html",
+            };
+            format!(
+                "FFmpeg no encontrado.\nInstálalo:\n  {}\n\nO define la variable FFMPEG_PATH apuntando al binario.",
+                install
+            )
+        })?;
+
+        let mut cmd = Command::new(&ffmpeg);
         cmd.arg("-y");
 
         if let Some(hw) = hwaccel {
@@ -53,8 +114,9 @@ impl FfmpegProcess {
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
 
-        let process = cmd.spawn().context("Failed to spawn FFmpeg process")?;
-        Ok(FfmpegProcess { process, stderr_output: None })
+        cmd.spawn()
+            .map_err(|e| format!("Error al ejecutar FFmpeg ({}): {}", ffmpeg.display(), e))
+            .map(|process| FfmpegProcess { process, stderr_output: None })
     }
 
     pub fn write_frame(&mut self, data: &[u8]) -> Result<()> {
