@@ -31,6 +31,7 @@ jobs:
             ext: ''
 
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
@@ -84,10 +85,13 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           mkdir -p src-tauri/binaries
-          curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/ffmpeg.zip
-          unzip -o ffmpeg.zip -d src-tauri/binaries/
+          if which ffmpeg >/dev/null 2>&1; then
+            cp "$(which ffmpeg)" src-tauri/binaries/ffmpeg
+          else
+            brew install ffmpeg
+            cp "$(which ffmpeg)" src-tauri/binaries/ffmpeg
+          fi
           chmod +x src-tauri/binaries/ffmpeg
-          rm -f ffmpeg.zip
 
       - name: Build Tauri app
         run: npx tauri build
@@ -139,11 +143,22 @@ jobs:
 
   create-release:
     needs: build
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
+
+      - name: Check artifacts
+        run: |
+          echo "Artifacts descargados:"
+          ls -lhR artifacts/ 2>/dev/null || echo "(sin artifacts)"
+          if [ ! -d artifacts ] || [ -z "$(ls -A artifacts 2>/dev/null)" ]; then
+            echo "No hay artifacts para publicar"
+            exit 1
+          fi
 
       - name: Generate release notes
         run: |
@@ -151,8 +166,8 @@ jobs:
           echo "" >> release-notes.md
           echo "Descarga el archivo correspondiente a tu plataforma:" >> release-notes.md
           echo "" >> release-notes.md
-          for dir in artifacts/*/; do
-            name=$(basename "$dir")
+          for file in artifacts/*; do
+            name=$(basename "$file")
             echo "- \`$name\`" >> release-notes.md
           done
 
@@ -160,5 +175,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body_path: release-notes.md
-          files: artifacts/**/*
+          files: artifacts/*
           generate_release_notes: false

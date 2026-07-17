@@ -81,10 +81,13 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           mkdir -p src-tauri/binaries
-          curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/ffmpeg.zip
-          unzip -o ffmpeg.zip -d src-tauri/binaries/
+          if which ffmpeg >/dev/null 2>&1; then
+            cp "$(which ffmpeg)" src-tauri/binaries/ffmpeg
+          else
+            brew install ffmpeg
+            cp "$(which ffmpeg)" src-tauri/binaries/ffmpeg
+          fi
           chmod +x src-tauri/binaries/ffmpeg
-          rm -f ffmpeg.zip
 
       - name: Build Tauri app
         run: npx tauri build
