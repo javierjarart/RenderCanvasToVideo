@@ -24,6 +24,7 @@ pub fn create_capture_webview(
         .resizable(false)
         .decorations(false)
         .skip_taskbar(true)
+        .visible(false)
         .build()
         .map_err(|e| format!("Error creando webview oculta: {}", e))?;
 
