@@ -32,6 +32,7 @@ pub struct LogResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RenderParams {
     pub project: Option<String>,
     pub width: u32,
