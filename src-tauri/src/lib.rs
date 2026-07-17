@@ -33,7 +33,9 @@ fn render_project(
     state: tauri::State<Mutex<AppState>>,
     params: RenderParams,
 ) -> Result<String, String> {
+    let path_debug = params.custom_project_path.clone().unwrap_or_else(|| "NULL".into());
     let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.add_log("log", format!("📥 custom_project_path = {}", path_debug));
     let job_id = s.add_job(params);
     s.add_log("log", format!("📥 Render añadido a la cola [{}]", &job_id[..8]));
     Ok(job_id)

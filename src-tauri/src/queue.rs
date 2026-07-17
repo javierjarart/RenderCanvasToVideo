@@ -60,6 +60,8 @@ impl QueueProcessor {
         let project_path = params
             .custom_project_path
             .as_deref()
+            .filter(|p| !p.is_empty())
+            .or_else(|| params.project.as_deref())
             .ok_or_else(|| "Se requiere custom_project_path".to_string())?
             .to_string();
 

@@ -139,41 +139,43 @@ function updateCodecInfo(presetKey) {
   codecInfo.value = `${preset.codec}  |  ${preset.container}  |  ${preset.pixFmt}  |  ${params}`;
 }
 
-btnSelectFolder.addEventListener('click', async () => {
+async function openDialog(options) {
   try {
-    const selected = await window.__TAURI__.dialog.open({
-      directory: true,
-      multiple: false,
-      title: 'Selecciona la carpeta del proyecto',
-    });
-    if (selected) {
-      const name = selected.split('/').pop() || selected.split('\\').pop() || 'proyecto';
-      projectPathEl.textContent = '📁 ' + name;
-      state.projectPath = selected;
-      state.projectEntry = null;
-    }
+    const selected = await invoke('plugin:dialog|open', options);
+    return selected;
   } catch (err) {
-    alert('Error al seleccionar carpeta: ' + err);
+    alert('Error al seleccionar: ' + err);
+    return null;
+  }
+}
+
+btnSelectFolder.addEventListener('click', async () => {
+  const selected = await openDialog({
+    directory: true,
+    multiple: false,
+    title: 'Selecciona la carpeta del proyecto',
+  });
+  if (selected) {
+    const name = selected.split('/').pop() || selected.split('\\').pop() || 'proyecto';
+    projectPathEl.textContent = '📁 ' + name;
+    state.projectPath = selected;
+    state.projectEntry = null;
   }
 });
 
 btnSelectFile.addEventListener('click', async () => {
-  try {
-    const selected = await window.__TAURI__.dialog.open({
-      multiple: false,
-      title: 'Selecciona el archivo HTML del proyecto',
-      filters: [{ name: 'HTML', extensions: ['html', 'htm'] }],
-    });
-    if (selected) {
-      const name = selected.split('/').pop() || selected.split('\\').pop() || 'proyecto';
-      const parent = selected.substring(0, selected.lastIndexOf('/')) ||
-                     selected.substring(0, selected.lastIndexOf('\\')) || '';
-      projectPathEl.textContent = '📄 ' + name + '  (' + (parent.split('/').pop() || parent.split('\\').pop() || parent) + ')';
-      state.projectPath = parent;
-      state.projectEntry = name;
-    }
-  } catch (err) {
-    alert('Error al seleccionar archivo: ' + err);
+  const selected = await openDialog({
+    multiple: false,
+    title: 'Selecciona el archivo HTML del proyecto',
+    filters: [{ name: 'HTML', extensions: ['html', 'htm'] }],
+  });
+  if (selected) {
+    const name = selected.split('/').pop() || selected.split('\\').pop() || 'proyecto';
+    const parent = selected.substring(0, selected.lastIndexOf('/')) ||
+                   selected.substring(0, selected.lastIndexOf('\\')) || '';
+    projectPathEl.textContent = '📄 ' + name + '  (' + (parent.split('/').pop() || parent.split('\\').pop() || parent) + ')';
+    state.projectPath = parent;
+    state.projectEntry = name;
   }
 });
 
