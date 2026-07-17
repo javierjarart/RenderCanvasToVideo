@@ -92,9 +92,14 @@ jobs:
       - name: Build Tauri app
         run: npx tauri build
 
-      - name: Copy FFmpeg next to standalone binary
-        run: |
-          cp src-tauri/binaries/* target/release/ 2>/dev/null || true
+      - name: Copy FFmpeg next to standalone binary (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: cp src-tauri/binaries/* target/release/ || true
+
+      - name: Copy FFmpeg next to standalone binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Copy-Item "src-tauri/binaries/*" "target/release/" -ErrorAction SilentlyContinue
 
       - name: Package binaries (Linux)
         if: runner.os == 'Linux'
