@@ -9,6 +9,25 @@ pub struct FfmpegProcess {
 }
 
 fn find_ffmpeg() -> Option<PathBuf> {
+    // 1. Check next to the executable (bundled with app)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let name = if cfg!(target_os = "windows") { "ffmpeg.exe" } else { "ffmpeg" };
+            let bundled = parent.join(name);
+            if bundled.is_file() {
+                return Some(bundled);
+            }
+            // macOS .app bundle: Resources/ffmpeg
+            if cfg!(target_os = "macos") {
+                let mac = parent.join("../Resources/ffmpeg");
+                if mac.is_file() {
+                    return Some(mac);
+                }
+            }
+        }
+    }
+
+    // 2. FFMPEG_PATH env var
     if let Ok(candidates) = std::env::var("FFMPEG_PATH") {
         let p = PathBuf::from(&candidates);
         if p.is_file() {
@@ -16,6 +35,7 @@ fn find_ffmpeg() -> Option<PathBuf> {
         }
     }
 
+    // 3. Common system paths
     let common = if cfg!(target_os = "windows") {
         vec![
             "ffmpeg.exe",
@@ -39,7 +59,7 @@ fn find_ffmpeg() -> Option<PathBuf> {
         }
     }
 
-    // Try `which` / `where` as last resort
+    // 4. Try `which` / `where` as last resort
     let which = if cfg!(target_os = "windows") { "where" } else { "which" };
     if let Ok(out) = Command::new(which).arg("ffmpeg").output() {
         if out.status.success() {

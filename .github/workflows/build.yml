@@ -57,8 +57,41 @@ jobs:
             javascriptcoregtk-4.1-dev \
             libsoup-3.0-dev
 
+      - name: Download FFmpeg (Linux static)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p src-tauri/binaries
+          wget -qO ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz
+          tar -xf ffmpeg.tar.xz
+          cp ffmpeg-git-*-amd64-static/ffmpeg src-tauri/binaries/ffmpeg
+          chmod +x src-tauri/binaries/ffmpeg
+          rm -rf ffmpeg.tar.xz ffmpeg-git-*-amd64-static
+
+      - name: Download FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/binaries
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
+          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg"
+          Copy-Item "ffmpeg/ffmpeg-*/bin/ffmpeg.exe" "src-tauri/binaries/ffmpeg.exe"
+          Remove-Item -Recurse -Force ffmpeg.zip, ffmpeg
+
+      - name: Download FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p src-tauri/binaries
+          curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/ffmpeg.zip
+          unzip -o ffmpeg.zip -d src-tauri/binaries/
+          chmod +x src-tauri/binaries/ffmpeg
+          rm -f ffmpeg.zip
+
       - name: Build Tauri app
         run: npx tauri build
+
+      - name: Copy FFmpeg next to standalone binary
+        run: |
+          cp src-tauri/binaries/* target/release/ 2>/dev/null || true
 
       - name: Upload bundle
         uses: actions/upload-artifact@v4
