@@ -6,13 +6,7 @@ on:
 
 jobs:
   build:
-    continue-on-error: true
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-      fail-fast: false
-
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -29,31 +23,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target/
-          key: ${{ runner.os }}-cargo-release-${{ hashFiles('src-tauri/Cargo.lock') }}
+          key: windows-cargo-release-${{ hashFiles('src-tauri/Cargo.lock') }}
 
-      - name: Install Linux system deps
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libxdo-dev
-
-      - name: Download FFmpeg (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          mkdir -p src-tauri/binaries
-          wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-          tar xf ffmpeg-release-amd64-static.tar.xz
-          cp ffmpeg-*-static/ffmpeg src-tauri/binaries/
-          chmod +x src-tauri/binaries/ffmpeg
-          rm -rf ffmpeg-*-static ffmpeg-release-amd64-static.tar.xz
-
-      - name: Download FFmpeg (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Download FFmpeg
         shell: pwsh
         run: |
           mkdir src-tauri/binaries -Force
@@ -62,13 +34,6 @@ jobs:
           cp ffmpeg-*/bin/ffmpeg.exe src-tauri/binaries/
           Remove-Item ffmpeg.zip -Force
           Get-ChildItem -Directory ffmpeg-* | Remove-Item -Recurse -Force
-
-      - name: Download FFmpeg (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install ffmpeg
-          mkdir -p src-tauri/binaries
-          cp "$(which ffmpeg)" src-tauri/binaries/
 
       - name: Install npm dependencies
         run: npm ci
@@ -79,20 +44,18 @@ jobs:
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bundle-${{ runner.os }}
+          name: bundle-Windows
           path: target/release/bundle/
           if-no-files-found: error
 
   create-release:
     needs: [build]
     runs-on: ubuntu-latest
-    if: always()
 
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: bundle-*
-          merge-multiple: true
+          name: bundle-Windows
           path: bundles/
 
       - name: Create GitHub Release
