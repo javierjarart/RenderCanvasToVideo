@@ -141,8 +141,12 @@ function updateCodecInfo(presetKey) {
 
 async function openDialog(options) {
   try {
+    if (window.__TAURI__.dialog?.open) {
+      const selected = await window.__TAURI__.dialog.open(options);
+      return selected || null;
+    }
     const selected = await invoke('plugin:dialog|open', options);
-    return selected;
+    return selected || null;
   } catch (err) {
     alert('Error al seleccionar: ' + err);
     return null;
