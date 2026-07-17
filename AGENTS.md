@@ -419,7 +419,7 @@ Ruta: `src-tauri/tauri.conf.json`
 ```json
 {
   "productName": "RenderCanvasToVideo",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "identifier": "com.javierjarart.rendercanvastovideo",
   "build": {
     "frontendDist": "../public",

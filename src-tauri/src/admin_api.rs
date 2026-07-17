@@ -277,7 +277,7 @@ fn handle_mcp_initialize(req: &JsonRpcRequest) {
         "capabilities": capabilities,
         "serverInfo": {
             "name": "RenderCanvasToVideo",
-            "version": "0.2.3"
+            "version": "0.3.0"
         }
     }));
 }
