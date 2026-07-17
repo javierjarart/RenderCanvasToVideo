@@ -628,6 +628,59 @@ du -sh src-tauri/target/release/build/* src-tauri/target/release/deps/* 2>/dev/n
 
 ---
 
+## Cambios recientes (jul 2026)
+
+### Bugs corregidos en frontend
+
+| Archivo | Cambio |
+|---|---|
+| `src-tauri/tauri.conf.json` | `removeUnusedCommands: true` → `false` (Tauri eliminaba comandos al no detectarlos en vanilla JS) |
+| `public/index.html` | `form-group` de la fila carpeta → `flex1` (botones ocupan todo el ancho lado a lado) |
+| `public/index.html` | `pre#log-content` → `div#log-content` (pre no acepta hijos div) |
+| `public/app.js` | `openDialog()` ahora usa `window.__TAURI__.dialog?.open()` con fallback a `invoke('plugin:dialog|open', ...)` |
+
+### FFmpeg — detección y bundling
+
+**`src-tauri/src/ffmpeg.rs`**: `find_ffmpeg()` busca en este orden:
+1. `<exe_dir>/ffmpeg` (o `ffmpeg.exe`) — binario bundlado junto al ejecutable
+2. `<exe_dir>/../Resources/ffmpeg` — macOS .app bundle
+3. `FFMPEG_PATH` env var
+4. Rutas comunes del sistema (`/usr/bin/ffmpeg`, `C:\ffmpeg\bin\`, etc.)
+5. `which`/`where` como último recurso
+
+Si no encuentra FFmpeg, muestra error con instrucciones de instalación según el SO.
+
+**Bundling en CI**: Los workflows descargan FFmpeg estático y lo colocan en `src-tauri/binaries/` **antes** de `npx tauri build`. `tauri.conf.json` incluye `bundle.resources.binaries/*` para embeberlo en instaladores (.deb, .msi, .dmg). También se copia a `target/release/` para la versión portable.
+
+Fuentes de descarga por plataforma:
+- **Linux**: `johnvansickle.com` (static build)
+- **Windows**: `gyan.dev` (release essentials)
+- **macOS**: `brew install ffmpeg` (`which ffmpeg` si ya existe)
+
+### GitHub Actions
+
+**`.github/workflows/build.yml`** — CI en push a `refactor-vanilla`/`main`:
+- Matrix: `ubuntu-latest`, `windows-latest`, `macos-latest`
+- Node.js v24 con cache npm
+- Dependencias de sistema Linux (webkit2gtk-4.1, etc.)
+- Descarga FFmpeg + `npx tauri build` → sube bundle como artifact
+
+**`.github/workflows/release.yml`** — Release al pushear tag `v*`:
+- Matrix multiplataforma con `continue-on-error: true`
+- Jobs individuales no bloquean el release si una plataforma falla
+- `create-release` con `if: always()` y `merge-multiple: true` en artifacts
+- Usa `softprops/action-gh-release@v2` para crear GitHub Release
+
+### Release actual
+
+- Tag: `v0.3.0` (último commit: `b0f62ca`)
+- Estado: en progreso en https://github.com/javierjarart/RenderCanvasToVideo/actions
+- Si falla macOS/Linux, Windows igual se publica por `continue-on-error: true`
+
+### README
+
+Reescrito para ser amigable al usuario final: menos técnico, más directo, instrucciones simplificadas, sección de descarga para todas las plataformas.
+
 ## Notas importantes
 
 1. **`withGlobalTauri: true`** es OBLIGATORIO para que `window.__TAURI__` esté disponible sin npm.
@@ -636,3 +689,5 @@ du -sh src-tauri/target/release/build/* src-tauri/target/release/deps/* 2>/dev/n
 4. **El MCP se integra**: Cuando se ejecuta con `--mcp`, el binario actúa como servidor MCP sin abrir ventana. Cuando se ejecuta sin argumentos, muestra la UI normal.
 5. **Presets**: Copiar exactamente desde `src/components/RenderForm.tsx` línea 6 a 36 para mantener compatibilidad.
 6. **El diálogo de carpeta**: En vanilla JS se usa `window.__TAURI__.dialog.open()` o `invoke('plugin:dialog|open', ...)`. Consultar documentación de `@tauri-apps/plugin-dialog` para el API exacto sin npm (usando `withGlobalTauri`).
+7. **FFmpeg bundlado**: La app busca `<exe_dir>/ffmpeg` primero. Si no existe, intenta PATH. En CI se descarga automáticamente. Para desarrollo local, instalar FFmpeg en el sistema.
+8. **Release multiplataforma**: `continue-on-error: true` permite que el release se publique aunque una plataforma falle. Los artifacts se descargan con `merge-multiple: true`.
