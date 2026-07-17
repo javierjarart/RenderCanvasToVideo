@@ -1,4 +1,4 @@
-name: Build Windows Installer
+name: Build Windows Portable EXE
 on:
   push:
     branches: [refactor-vanilla, main]
@@ -19,15 +19,16 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Build Tauri app (Windows installer)
-        run: npx tauri build
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Build Tauri app (standalone EXE)
+        run: npx tauri build --no-bundle
 
-      - name: Upload installer artifacts
+      - name: Package as ZIP
+        run: |
+          Compress-Archive -Path target/release/rendercanvastovideo.exe -DestinationPath RenderCanvasToVideo-windows-x64.zip
+
+      - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
-          path: target/release/bundle/
+          name: RenderCanvasToVideo-windows-x64
+          path: RenderCanvasToVideo-windows-x64.zip
           if-no-files-found: error

@@ -4,6 +4,7 @@ mod ffmpeg;
 mod queue;
 mod server;
 mod state;
+mod webview2;
 
 use capture::close_capture_webview;
 pub use ffmpeg::FfmpegProcess;
@@ -214,6 +215,19 @@ fn get_project_url(state: tauri::State<Mutex<AppState>>, job_id: String) -> Resu
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if let Err(e) = webview2::ensure_installed() {
+        #[cfg(target_os = "windows")]
+        {
+            let msg = format!("Error al instalar WebView2 Runtime:\n\n{}\n\nDescárgalo manualmente desde:\nhttps://developer.microsoft.com/en-us/microsoft-edge/webview2/", e);
+            let _ = std::process::Command::new("powershell")
+                .args(["-NoProfile", "-Command", &format!("Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('{}', 'RenderCanvasToVideo - Error', 'OK', 'Error')", msg.replace('\'', "''"))])
+                .output();
+        }
+        #[cfg(not(target_os = "windows"))]
+        let _ = e;
+        std::process::exit(1);
+    }
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())

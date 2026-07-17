@@ -26,3 +26,4 @@ tiny_http = "0.12"
 chrono = { version = "0.4", features = ["serde"] }
 tauri-plugin-dialog = "2"
 url = "2"
+ureq = "3"
