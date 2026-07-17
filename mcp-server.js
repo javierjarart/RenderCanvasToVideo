@@ -21,10 +21,12 @@ const app = express();
 app.use(express.json());
 
 app.use((req, res, next) => {
-    res.setHeader(
-        'Content-Security-Policy',
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
-    );
+    if (!req.path.startsWith('/proyectos/') && !req.path.startsWith('/external-project/')) {
+        res.setHeader(
+            'Content-Security-Policy',
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+        );
+    }
     next();
 });
 
@@ -90,7 +92,7 @@ app.post('/api/render', async (req, res) => {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = req.body;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace, canvasSelector } = req.body;
     const totalFrames = parseInt(fps) * parseInt(duration);
 
     const vCodec = codec || 'libx264';
@@ -182,8 +184,8 @@ app.post('/api/render', async (req, res) => {
         }
 
         const codecArgs = ['-c:v', vCodec, '-pix_fmt', vPixFmt];
-        if (vCodec === 'libx264') {
-            codecArgs.push('-crf', String(crf || 18));
+        if (vCodec === 'libx264' || vCodec === 'libx265') {
+            codecArgs.push('-crf', String(crf || (vCodec === 'libx265' ? 28 : 18)));
         }
         for (const [key, val] of Object.entries(vCodecParams)) {
             if (ALLOWED_CODEC_PARAMS.has(key)) {
@@ -321,14 +323,15 @@ async function main() {
             bgColor: z.string().optional().describe('Background color for transparent pixels (hex, e.g. #000000)'),
             customOutputDir: z.string().optional().describe('Custom output directory for the rendered video'),
             customProjectPath: z.string().optional().describe('Path to an external project folder containing index.html with a canvas'),
-            codec: z.string().optional().describe('Video codec (libx264, hap, cfhd)'),
+            codec: z.string().optional().describe('Video codec (libx264, libx265, hap, cfhd)'),
             container: z.string().optional().describe('Container extension (.mp4, .mov)'),
-            pixFmt: z.string().optional().describe('Pixel format (yuv420p, yuv422p)'),
+            pixFmt: z.string().optional().describe('Pixel format (yuv420p, yuv422p, yuv420p10le)'),
             codecParams: z.record(z.string()).optional().describe('Codec-specific parameters (e.g. {"format":"hap_q"})'),
-            crf: z.number().optional().describe('CRF quality for libx264 (0-51, lower=better)'),
+            crf: z.number().optional().describe('CRF quality for libx264/libx265 (0-51, lower=better). Default: 18 for H.264, 28 for H.265'),
             colorPrimaries: z.string().optional().describe('Color primaries (bt709, bt2020, smpte432)'),
             colorTrc: z.string().optional().describe('Color transfer characteristics (bt709, bt2020-10, gamma28)'),
             colorSpace: z.string().optional().describe('Color space (bt709, bt2020nc, smpte432)'),
+            canvasSelector: z.string().optional().describe('CSS selector for the canvas element to capture (e.g. "#canvas" or ".webgl-canvas"). Defaults to the first <canvas> found.'),
         },
         async (args) => {
             if (renderStatus.state === 'rendering') {
@@ -338,7 +341,7 @@ async function main() {
                 };
             }
 
-            const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, colorPrimaries, colorTrc, colorSpace } = args;
+            const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, colorPrimaries, colorTrc, colorSpace, canvasSelector } = args;
             const totalFrames = parseInt(fps) * parseInt(duration);
 
             const vCodec = codec || 'libx264';
@@ -376,7 +379,7 @@ async function main() {
                 customOutputDir, customProjectPath, totalFrames,
                 projectName, fileName, outputPath,
                 codec: vCodec, container: vContainer, pixFmt: vPixFmt, codecParams: vCodecParams,
-                colorPrimaries, colorTrc, colorSpace
+                colorPrimaries, colorTrc, colorSpace, canvasSelector
             }).catch(err => {
                 process.stderr.write(err.stack + '\n');
                 renderStatus.state = 'error';
@@ -488,7 +491,8 @@ async function main() {
             height: z.number().optional().describe('Viewport height (default: 360)'),
             time: z.number().optional().describe('Time in milliseconds to capture (default: 0)'),
             bgColor: z.string().optional().describe('Background color for transparent pixels (hex)'),
-            customProjectPath: z.string().optional().describe('Path to external project folder')
+            customProjectPath: z.string().optional().describe('Path to external project folder'),
+            canvasSelector: z.string().optional().describe('CSS selector for the canvas element to capture (e.g. "#canvas"). Defaults to the first <canvas> found.')
         },
         async (args) => {
             if (!chromeExecutablePath) {
@@ -545,7 +549,7 @@ async function main() {
                     return { content: [{ type: 'text', text: 'Could not load the project page.' }], isError: true };
                 }
 
-                const hasCanvas = await page.evaluate(() => !!document.querySelector('canvas'));
+                const hasCanvas = await page.evaluate((sel) => !!document.querySelector(sel || 'canvas'), args.canvasSelector);
                 if (!hasCanvas) {
                     await browser.close();
                     return { content: [{ type: 'text', text: 'No canvas element found on the page.' }], isError: true };
@@ -559,8 +563,8 @@ async function main() {
 
                 await new Promise(r => setTimeout(r, 200));
 
-                const base64 = await page.evaluate((bg) => {
-                    const c = document.querySelector('canvas');
+                const base64 = await page.evaluate(({ bg, sel }) => {
+                    const c = document.querySelector(sel || 'canvas');
                     const tc = document.createElement('canvas');
                     tc.width = c.width; tc.height = c.height;
                     const ctx = tc.getContext('2d');
@@ -568,7 +572,7 @@ async function main() {
                     ctx.fillRect(0, 0, tc.width, tc.height);
                     ctx.drawImage(c, 0, 0);
                     return tc.toDataURL('image/png');
-                }, args.bgColor || '#000000');
+                }, { bg: args.bgColor || '#000000', sel: args.canvasSelector });
 
                 await browser.close();
                 return { content: [{ type: 'image', data: base64.replace(/^data:image\/png;base64,/, ''), mimeType: 'image/png' }] };
@@ -742,7 +746,7 @@ function walkDir(dir, files, prefix) {
 }
 
 async function renderLoop(params) {
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, totalFrames, fileName, outputPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = params;
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, totalFrames, fileName, outputPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace, canvasSelector } = params;
 
     try {
         let executablePath = null;
@@ -807,8 +811,8 @@ async function renderLoop(params) {
         }
 
         const codecArgs2 = ['-c:v', codec || 'libx264', '-pix_fmt', pixFmt || 'yuv420p'];
-        if ((codec || 'libx264') === 'libx264') {
-            codecArgs2.push('-crf', String(crf || 18));
+        if ((codec || 'libx264') === 'libx264' || (codec || 'libx264') === 'libx265') {
+            codecArgs2.push('-crf', String(crf || ((codec || 'libx264') === 'libx265' ? 28 : 18)));
         }
         for (const [key, val] of Object.entries(codecParams || {})) {
             if (ALLOWED_CODEC_PARAMS.has(key)) {
@@ -872,8 +876,8 @@ async function renderLoop(params) {
                         }
                     }, timeMs);
 
-                    const base64Data = await page.evaluate((bg) => {
-                        const targetCanvas = document.querySelector('canvas');
+                    const base64Data = await page.evaluate(({ bg, sel }) => {
+                        const targetCanvas = document.querySelector(sel || 'canvas');
                         if (!window.__exportCanvas) {
                             window.__exportCanvas = document.createElement('canvas');
                             window.__exportCtx = window.__exportCanvas.getContext('2d');
@@ -886,7 +890,7 @@ async function renderLoop(params) {
                         ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
                         ctx.drawImage(targetCanvas, 0, 0);
                         return tempCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
-                    }, bgColor || '#000000');
+                    }, { bg: bgColor || '#000000', sel: canvasSelector });
 
                     ffmpeg.stdin.write(Buffer.from(base64Data, 'base64'));
                     renderStatus.progress = i;

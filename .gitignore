@@ -29,3 +29,9 @@ vscode-extension/
 src-tauri/target/
 src-tauri/gen/
 
+# Root build artifacts
+target/
+
+# Python virtual environment
+venv/
+

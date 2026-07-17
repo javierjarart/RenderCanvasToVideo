@@ -1,168 +1,242 @@
-use serde::{Deserialize, Serialize};
+mod admin_api;
+mod capture;
+mod ffmpeg;
+mod queue;
+mod server;
+mod state;
 
-// ─── Tipos compartidos ─────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RenderParams {
-    pub project: Option<String>,
-    pub width: u32,
-    pub height: u32,
-    pub fps: u32,
-    pub duration: u32,
-    pub bg_color: Option<String>,
-    pub custom_project_path: Option<String>,
-    pub codec: Option<String>,
-    pub container: Option<String>,
-    pub pix_fmt: Option<String>,
-    pub codec_params: Option<std::collections::HashMap<String, String>>,
-    pub crf: Option<u32>,
-    pub color_primaries: Option<String>,
-    pub color_trc: Option<String>,
-    pub color_space: Option<String>,
-    pub canvas_selector: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RenderStatus {
-    pub state: String,
-    pub progress: u32,
-    pub total: u32,
-    pub file_url: Option<String>,
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LogEntry {
-    pub timestamp: String,
-    pub level: String,
-    pub message: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LogResponse {
-    pub logs: Vec<LogEntry>,
-    pub total: usize,
-}
-
-// ─── Estado global del render ──────────────────────────────────────────────
-
+use capture::close_capture_webview;
+pub use ffmpeg::FfmpegProcess;
+use queue::QueueProcessor;
+use state::{AppState, JobInfo, LogResponse, RenderParams};
+use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-
-struct AppState {
-    render_status: RenderStatus,
-    log_buffer: Vec<LogEntry>,
-}
-
-// ─── Comandos Tauri ────────────────────────────────────────────────────────
+use tauri::Emitter;
 
 #[tauri::command]
-fn get_status(state: tauri::State<Mutex<AppState>>) -> RenderStatus {
-    state.lock().unwrap().render_status.clone()
+fn get_status(state: tauri::State<Mutex<AppState>>) -> Result<Vec<JobInfo>, String> {
+    state.lock().map(|s| s.get_jobs_info()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn get_logs(state: tauri::State<Mutex<AppState>>, since: usize) -> LogResponse {
-    let buf = &state.lock().unwrap().log_buffer;
-    LogResponse {
-        logs: buf.iter().skip(since).cloned().collect(),
-        total: buf.len(),
-    }
+fn get_logs(state: tauri::State<Mutex<AppState>>, since: usize) -> Result<LogResponse, String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    Ok(LogResponse {
+        logs: s.log_buffer.iter().skip(since).cloned().collect(),
+        total: s.log_buffer.len(),
+    })
 }
 
 #[tauri::command]
 fn render_project(
-    _app: tauri::AppHandle,
     state: tauri::State<Mutex<AppState>>,
-    _params: RenderParams,
+    params: RenderParams,
 ) -> Result<String, String> {
-    let mut s = state.lock().unwrap();
-    if s.render_status.state == "rendering" {
-        return Err("Ya hay un render en proceso.".into());
-    }
-
-    s.render_status = RenderStatus {
-        state: "rendering".into(),
-        progress: 0,
-        total: 0,
-        file_url: None,
-        error: None,
-    };
-
-    // TODO (Fase 2): Implementar pipeline real de captura + encoding
-    s.log_buffer.push(LogEntry {
-        timestamp: chrono_now(),
-        level: "log".into(),
-        message: "Render iniciado (placeholder - Fase 2)".into(),
-    });
-
-    Ok("Render iniciado (placeholder)".into())
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let job_id = s.add_job(params);
+    s.add_log("log", format!("📥 Render añadido a la cola [{}]", &job_id[..8]));
+    Ok(job_id)
 }
 
 #[tauri::command]
-fn cancel_render(state: tauri::State<Mutex<AppState>>) -> Result<String, String> {
-    let mut s = state.lock().unwrap();
-    if s.render_status.state != "rendering" {
-        return Err("No hay un render en proceso.".into());
+fn send_frame(
+    app: tauri::AppHandle,
+    state: tauri::State<Mutex<AppState>>,
+    job_id: String,
+    data: String,
+    frame: u32,
+    total: u32,
+) -> Result<String, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let job_idx = s.jobs.iter().position(|j| j.info.id == job_id).ok_or("Job no encontrado")?;
+
+    {
+        let job = s.jobs.get_mut(job_idx).ok_or("Job no encontrado")?;
+        if job.info.status != "rendering" {
+            return Err("El job no está en estado rendering.".into());
+        }
+        if job.cancel_flag.load(Ordering::SeqCst) {
+            return Err("Render cancelado".into());
+        }
+
+        let frame_data = base64::Engine::decode(
+            &base64::engine::general_purpose::STANDARD,
+            &data,
+        )
+        .map_err(|e| format!("Error decodificando frame: {}", e))?;
+
+        if let Some(ref ffmpeg) = job.ffmpeg_process {
+            let mut ff = ffmpeg.lock().map_err(|e| e.to_string())?;
+            ff.write_frame(&frame_data)
+                .map_err(|e| format!("Error escribiendo frame: {}", e))?;
+        }
+
+        job.info.progress = frame;
     }
-    s.render_status.state = "cancelled".into();
-    s.log_buffer.push(LogEntry {
-        timestamp: chrono_now(),
-        level: "log".into(),
-        message: "Render cancelado por el usuario.".into(),
-    });
+
+    if frame % std::cmp::max(1, total / 10) == 0 || frame == total {
+        let name = s.jobs[job_idx].info.project_name.clone();
+        let pct = (frame * 100) / total;
+        s.add_log("log", format!("[{}] Cuadro {}/{} ({}%)", name, frame, total, pct));
+        let _ = app.emit("render-progress", serde_json::json!({
+            "jobId": job_id,
+            "frame": frame,
+            "total": total,
+            "progress": pct,
+        }));
+    }
+
+    Ok("OK".into())
+}
+
+#[tauri::command]
+fn finalize_render(
+    app: tauri::AppHandle,
+    state: tauri::State<Mutex<AppState>>,
+    job_id: String,
+) -> Result<String, String> {
+    close_capture_webview(&app);
+
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let job_idx = s.jobs.iter().position(|j| j.info.id == job_id).ok_or("Job no encontrado")?;
+
+    let name: String;
+    let cancelled: bool;
+
+    {
+        let job = s.jobs.get_mut(job_idx).ok_or("Job no encontrado")?;
+        if job.info.status != "rendering" {
+            return Err("El job no está en estado rendering.".into());
+        }
+        name = job.info.project_name.clone();
+        cancelled = job.cancel_flag.load(Ordering::SeqCst);
+
+        // signal server shutdown
+        if let Some(ref shutdown) = job.server_shutdown {
+            shutdown.store(true, Ordering::SeqCst);
+        }
+
+        if cancelled {
+            job.info.status = "cancelled".into();
+            if let Some(ref ffmpeg) = job.ffmpeg_process {
+                let mut ff = ffmpeg.lock().map_err(|e| e.to_string())?;
+                let _ = ff.kill();
+            }
+            let _ = app.emit("render-done", job.info.clone());
+            s.add_log("log", format!("[{}] Render cancelado.", name));
+            return Ok("Render cancelado".into());
+        }
+
+        if let Some(ref ffmpeg) = job.ffmpeg_process {
+            let mut ff = ffmpeg.lock().map_err(|e| e.to_string())?;
+            ff.close_stdin()
+                .map_err(|e| format!("Error cerrando FFmpeg: {}", e))?;
+            ff.wait()
+                .map_err(|e| format!("Error esperando FFmpeg: {}", e))?;
+        }
+
+        job.info.status = "done".into();
+        job.info.file_url = job.rendered_file_path.clone();
+        job.info.progress = job.info.total;
+    }
+
+    s.add_log("log", format!("[{}] Render completado exitosamente.", name));
+
+    if let Some(job) = s.jobs.get(job_idx) {
+        let _ = app.emit("render-done", job.info.clone());
+    }
+
+    Ok("Render completado".into())
+}
+
+#[tauri::command]
+fn cancel_render(
+    app: tauri::AppHandle,
+    state: tauri::State<Mutex<AppState>>,
+    job_id: String,
+) -> Result<String, String> {
+    close_capture_webview(&app);
+
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let job_idx = s.jobs.iter().position(|j| j.info.id == job_id).ok_or("Job no encontrado")?;
+
+    let name: String;
+    {
+        let job = s.jobs.get_mut(job_idx).ok_or("Job no encontrado")?;
+        if job.info.status != "rendering" {
+            return Err("El job no está en proceso.".into());
+        }
+        name = job.info.project_name.clone();
+        // signal server shutdown
+        if let Some(ref shutdown) = job.server_shutdown {
+            shutdown.store(true, Ordering::SeqCst);
+        }
+        job.cancel_flag.store(true, Ordering::SeqCst);
+        job.info.status = "cancelled".into();
+        if let Some(ref ffmpeg) = job.ffmpeg_process {
+            let mut ff = ffmpeg.lock().map_err(|e| e.to_string())?;
+            let _ = ff.kill();
+        }
+    }
+
+    s.add_log("log", format!("[{}] Render cancelado por el usuario.", name));
+    if let Some(job) = s.jobs.get(job_idx) {
+        let _ = app.emit("render-done", job.info.clone());
+    }
+
     Ok("Render cancelado".into())
 }
 
 #[tauri::command]
-fn reset_render_status(state: tauri::State<Mutex<AppState>>) -> String {
-    let mut s = state.lock().unwrap();
-    s.render_status = RenderStatus {
-        state: "idle".into(),
-        progress: 0,
-        total: 0,
-        file_url: None,
-        error: None,
-    };
-    "Estado reseteado".into()
+fn remove_job(state: tauri::State<Mutex<AppState>>, job_id: String) -> Result<String, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let len_before = s.jobs.len();
+    s.jobs.retain(|j| j.info.id != job_id);
+    if s.jobs.len() < len_before {
+        Ok(format!("Job {} eliminado", &job_id[..8]))
+    } else {
+        Err("Job no encontrado".into())
+    }
 }
 
-fn chrono_now() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let dur = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = dur.as_secs();
-    let h = (secs / 3600) % 24;
-    let m = (secs / 60) % 60;
-    let s = secs % 60;
-    format!("{:02}:{:02}:{:02}", h, m, s)
+#[tauri::command]
+fn clear_completed(state: tauri::State<Mutex<AppState>>) -> Result<String, String> {
+    state.lock().map_err(|e| e.to_string())?.remove_completed();
+    Ok("Completados eliminados".into())
 }
 
-// ─── Entry point ───────────────────────────────────────────────────────────
+#[tauri::command]
+fn get_project_url(state: tauri::State<Mutex<AppState>>, job_id: String) -> Result<Option<String>, String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    Ok(s.jobs.iter().find(|j| j.info.id == job_id).and_then(|j| {
+        j.project_server_port
+            .map(|port| format!("http://127.0.0.1:{}", port))
+    }))
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app_state = Mutex::new(AppState {
-        render_status: RenderStatus {
-            state: "idle".into(),
-            progress: 0,
-            total: 0,
-            file_url: None,
-            error: None,
-        },
-        log_buffer: Vec::with_capacity(2000),
-    });
-
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(app_state)
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .manage(Mutex::new(AppState::new()))
         .invoke_handler(tauri::generate_handler![
             get_status,
             get_logs,
             render_project,
+            send_frame,
+            finalize_render,
             cancel_render,
-            reset_render_status,
+            remove_job,
+            clear_completed,
+            get_project_url,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("error al ejecutar la aplicación Tauri");
+
+    QueueProcessor::start(app.handle().clone());
+    admin_api::start(app.handle().clone());
+
+    app.run(|_app_handle, _event| {});
 }

@@ -98,7 +98,7 @@ class Renderer:
 
         project_name_display = custom_path and os.path.basename(custom_path) or project
         params_str = " ".join(f"{k}={v}" for k, v in codec_params.items()) if codec_params else ""
-        codec_info = f"{codec}  {pix_fmt}  CRF={capture_cfg['crf']}" if codec == "libx264" else f"{codec}  {pix_fmt}"
+        codec_info = f"{codec}  {pix_fmt}  CRF={capture_cfg['crf']}" if codec in ("libx264", "libx265") else f"{codec}  {pix_fmt}"
         if params_str:
             codec_info += f"  {params_str}"
         print(f"  Project:   {project_name_display}")

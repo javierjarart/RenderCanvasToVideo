@@ -11,14 +11,16 @@
         <h1></h1>
         <form id="renderForm">
             <div class="row">
-                <button type="button" id="btnChooseProjectDir" class="flex-1">📁 Carpeta de Entrada</button>
-                <button type="button" id="btnChooseDir" class="flex-1">📁 Carpeta de Salida</button>
+                <div class="form-group flex-1" id="dropZone">
+                    <label>Archivo del proyecto</label>
+                    <button type="button" id="btnUploadFile" style="width:100%;">📄 Subir archivo</button>
+                    <input type="file" id="fileInputFile" accept=".html" hidden>
+                    <div id="dropOverlay">Suelta el archivo aquí</div>
+                </div>
+                <div class="form-group flex-1" style="justify-content:flex-end;">
+                    <span id="selectedProjectDirDisplay" class="path-display"></span>
+                </div>
             </div>
-            <div class="row">
-                <span id="selectedProjectDirDisplay" class="path-display flex-1"></span>
-                <span id="selectedDirDisplay" class="path-display flex-1"></span>
-            </div>
-
             <div class="row">
                 <div class="form-group flex-1">
                     <label>Presets</label>
@@ -63,6 +65,19 @@
                 </div>
             </div>
 
+            <div class="row">
+                <div class="form-group flex-1">
+                    <label>Selector de Canvas</label>
+                    <select id="canvasSelector">
+                        <option value="">Primer &lt;canvas&gt;</option>
+                    </select>
+                </div>
+                <div class="form-group flex-1">
+                    <label></label>
+                    <span class="hint">Selectores detectados en el proyecto</span>
+                </div>
+            </div>
+
             <button type="submit" id="btnRender">▶ <span>Iniciar Render</span></button>
         </form>
 
@@ -73,7 +88,7 @@
             </div>
             <div class="inline-row mt-10">
                 <a id="downloadLink" href="#" download class="flex-1">⬇ Guardar Como</a>
-                <button id="btnOpenFolder" class="flex-1">📂 Abrir Carpeta</button>
+                <button id="btnStopRender" class="flex-1" style="display:none;">⏹ Detener render</button>
             </div>
         </div>
 

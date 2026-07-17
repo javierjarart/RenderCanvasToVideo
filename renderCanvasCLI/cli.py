@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--output", "-o", help="Output directory")
     r.add_argument("--crf", type=int, help="FFmpeg CRF quality (0-51, lower=better)")
     r.add_argument("--ffpreset", "--ffmpeg-preset", dest="ffpreset", help="FFmpeg preset (ultrafast, medium, slow, etc.)")
-    r.add_argument("--codec", help="Video codec (libx264, hap, cfhd)")
+    r.add_argument("--codec", help="Video codec (libx264, libx265, hap, cfhd)")
     r.add_argument("--container", help="Container extension (.mp4, .mov)")
     r.add_argument("--pix-fmt", dest="pix_fmt", help="Pixel format (yuv420p, yuv422p)")
 

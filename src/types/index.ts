@@ -33,14 +33,21 @@ export interface RenderParams {
   colorTrc?: string;
   colorSpace?: string;
   canvasSelector?: string;
+  filters?: string;
+  hwaccel?: string;
 }
 
-export interface RenderStatus {
-  state: 'idle' | 'rendering' | 'done' | 'error' | 'cancelled';
+export interface JobInfo {
+  id: string;
+  status: 'queued' | 'rendering' | 'done' | 'error' | 'cancelled';
   progress: number;
   total: number;
-  fileUrl: string | null;
+  file_url: string | null;
   error: string | null;
+  params: RenderParams;
+  project_name: string;
+  output_filename: string;
+  created_at: string;
 }
 
 export interface LogEntry {

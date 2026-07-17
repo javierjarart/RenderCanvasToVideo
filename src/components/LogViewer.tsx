@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { LogEntry } from '../types';
 
 const styles = {
@@ -28,8 +29,7 @@ export default function LogViewer() {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/logs?since=${total}`);
-        const data = await res.json();
+        const data = await invoke<{ logs: LogEntry[]; total: number }>('get_logs', { since: total });
         if (data.logs?.length) {
           setLogs(prev => [...prev, ...data.logs]);
           if (open) {

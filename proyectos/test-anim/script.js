@@ -28,3 +28,5 @@ function draw(time) {
     ctx.textAlign = "center";
     ctx.fillText(`Frame: ${(t * 60).toFixed(0)}`, cx, cy + 40);
 }
+
+requestAnimationFrame(draw);

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import DropZone from './DropZone';
-import { useRenderStatus } from '../hooks/useRenderStatus';
 import type { Preset, ColorProfile, RenderParams } from '../types';
 
 const PRESETS: Record<string, Preset> = {
@@ -25,6 +25,14 @@ const PRESETS: Record<string, Preset> = {
   'hevc-4k-30':      { name: 'HEVC 4K 30fps',      width: 3840, height: 2160, fps: 30, codec: 'libx265', container: '.mp4', pixFmt: 'yuv420p', codecParams: {} },
   'hevc-4k-60':      { name: 'HEVC 4K 60fps',      width: 3840, height: 2160, fps: 60, codec: 'libx265', container: '.mp4', pixFmt: 'yuv420p', codecParams: {} },
   'hevc-hdr-hd':     { name: 'HEVC HDR HD 30fps',  width: 1920, height: 1080, fps: 30, codec: 'libx265', container: '.mp4', pixFmt: 'yuv420p10le', codecParams: {} },
+  'nvenc-h264-hd':   { name: 'NVENC H.264 HD',     width: 1920, height: 1080, fps: 60, codec: 'h264_nvenc', container: '.mp4', pixFmt: 'yuv420p', codecParams: { preset: 'p4' } },
+  'nvenc-h264-4k':   { name: 'NVENC H.264 4K',     width: 3840, height: 2160, fps: 30, codec: 'h264_nvenc', container: '.mp4', pixFmt: 'yuv420p', codecParams: { preset: 'p4' } },
+  'nvenc-hevc-hd':   { name: 'NVENC HEVC HD',      width: 1920, height: 1080, fps: 60, codec: 'hevc_nvenc', container: '.mp4', pixFmt: 'yuv420p', codecParams: { preset: 'p4' } },
+  'nvenc-hevc-4k':   { name: 'NVENC HEVC 4K',      width: 3840, height: 2160, fps: 30, codec: 'hevc_nvenc', container: '.mp4', pixFmt: 'yuv420p', codecParams: { preset: 'p4' } },
+  'vaapi-h264-hd':   { name: 'VAAPI H.264 HD',     width: 1920, height: 1080, fps: 60, codec: 'h264_vaapi', container: '.mp4', pixFmt: 'nv12', codecParams: {} },
+  'vaapi-hevc-hd':   { name: 'VAAPI HEVC HD',      width: 1920, height: 1080, fps: 60, codec: 'hevc_vaapi', container: '.mp4', pixFmt: 'nv12', codecParams: {} },
+  'videotoolbox-h264': { name: 'VideoToolbox H.264 HD', width: 1920, height: 1080, fps: 60, codec: 'h264_videotoolbox', container: '.mp4', pixFmt: 'yuv420p', codecParams: {} },
+  'videotoolbox-hevc': { name: 'VideoToolbox HEVC HD',  width: 1920, height: 1080, fps: 60, codec: 'hevc_videotoolbox', container: '.mp4', pixFmt: 'yuv420p', codecParams: {} },
 };
 
 const GROUP_LABELS: Record<string, string> = {
@@ -32,6 +40,9 @@ const GROUP_LABELS: Record<string, string> = {
   'hap-q-hd': '-- HAP MOV --',
   'cfhd-film-hd': '-- CineForm MOV --',
   'hevc-hd-30': '-- HEVC H.265 MP4 --',
+  'nvenc-h264-hd': '-- NVENC (NVIDIA) --',
+  'vaapi-h264-hd': '-- VAAPI (Linux/Intel/AMD) --',
+  'videotoolbox-h264': '-- VideoToolbox (macOS) --',
 };
 
 const COLOR_PROFILES: Record<string, ColorProfile> = {
@@ -61,10 +72,10 @@ export default function RenderForm() {
   const [fps, setFps] = useState(60);
   const [duration, setDuration] = useState(10);
   const [bgColor, setBgColor] = useState('#000000');
-  const [canvasSelector, setCanvasSelector] = useState('');
-  const [selectors, setSelectors] = useState<string[]>([]);
-  const { status, startPolling } = useRenderStatus();
-  const pollingRef = useRef(false);
+  const [canvasSelector, _setCanvasSelector] = useState('');
+  const [filters, setFilters] = useState('');
+  const [hwaccel, setHwaccel] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const preset = PRESETS[presetKey];
   const codecInfo = preset
@@ -83,18 +94,13 @@ export default function RenderForm() {
     applyPreset(presetKey);
   }, [presetKey, applyPreset]);
 
-  const handleFileSelected = (path: string, _name: string) => {
+  const handleFileSelected = async (path: string, _name: string) => {
     setProjectPath(path);
-    fetch(`/api/canvas-selectors?path=${encodeURIComponent(path)}`)
-      .then(r => r.json())
-      .then(d => setSelectors(d.selectors))
-      .catch(() => {});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectPath) { alert('Sube un archivo HTML primero.'); return; }
-    if (status.state === 'rendering') return;
+    if (!projectPath) { alert('Selecciona una carpeta de proyecto primero.'); return; }
 
     const colorProfile = COLOR_PROFILES[colorProfileKey] || {};
 
@@ -110,40 +116,16 @@ export default function RenderForm() {
       colorTrc: colorProfile.trc,
       colorSpace: colorProfile.space,
       canvasSelector: canvasSelector || undefined,
+      filters: filters || undefined,
+      hwaccel: hwaccel || undefined,
     };
 
     try {
-      const res = await fetch('/api/render', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))).error) || `HTTP ${res.status}`);
-      if (!pollingRef.current) {
-        pollingRef.current = true;
-        startPolling();
-      }
+      await invoke('render_project', { params: body });
     } catch (err) {
       alert('Error: ' + (err as Error).message);
     }
   };
-
-  const handleStop = async () => {
-    try {
-      await fetch('/api/render/cancel', { method: 'POST' });
-    } catch {}
-  };
-
-  const handleReset = async () => {
-    try {
-      await fetch('/api/render/reset', { method: 'POST' });
-    } catch {}
-  };
-
-  const isRendering = status.state === 'rendering';
-  const isDone = status.state === 'done';
-  const isError = status.state === 'error';
-  const isCancelled = status.state === 'cancelled';
 
   const renderOpts: { key: string; name: string; isGroup: boolean }[] = [];
   let lastGroup = '';
@@ -218,35 +200,57 @@ export default function RenderForm() {
         </div>
       </div>
 
-      <div style={styles.row}>
-        <div style={{ ...styles.flex1, ...styles.formGroup }}>
-          <label style={styles.label}>Selector de Canvas</label>
-          <select style={styles.select} value={canvasSelector} onChange={e => setCanvasSelector(e.target.value)}>
-            <option value="">Primer &lt;canvas&gt;</option>
-            {selectors.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+      <div style={{ marginTop: 2 }}>
+        <div
+          style={{ fontSize: 8, color: 'var(--muted)', cursor: 'pointer', userSelect: 'none', padding: '2px 0' }}
+          onClick={() => setShowAdvanced(!showAdvanced)}
+        >
+          {showAdvanced ? '▲' : '▼'} Opciones avanzadas
         </div>
-        <div style={{ ...styles.flex1, ...styles.formGroup }}>
-          <label style={styles.label}></label>
-          <div style={styles.hint}>Selectores detectados en el proyecto</div>
-        </div>
+        {showAdvanced && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 1 }}>
+            <div style={styles.row}>
+              <div style={{ ...styles.flex1, ...styles.formGroup }}>
+                <label style={styles.label}>Filtros FFmpeg (-vf)</label>
+                <input
+                  style={styles.input}
+                  type="text"
+                  value={filters}
+                  onChange={e => setFilters(e.target.value)}
+                  placeholder="eq. scale=1280:720,format=nv12"
+                />
+              </div>
+            </div>
+            <div style={styles.row}>
+              <div style={{ ...styles.flex1, ...styles.formGroup }}>
+                <label style={styles.label}>Aceleración HW</label>
+                <select style={styles.select} value={hwaccel} onChange={e => setHwaccel(e.target.value)}>
+                  <option value="">Ninguna (CPU)</option>
+                  <option value="cuda">CUDA (NVIDIA)</option>
+                  <option value="vaapi">VAAPI (Linux)</option>
+                  <option value="videotoolbox">VideoToolbox (macOS)</option>
+                  <option value="dxva2">DXVA2 (Windows)</option>
+                  <option value="qsv">QSV (Intel)</option>
+                </select>
+              </div>
+              <div style={{ ...styles.flex1, ...styles.formGroup }}>
+                <label style={styles.label}>Selector canvas</label>
+                <input
+                  style={styles.input}
+                  type="text"
+                  value={canvasSelector}
+                  onChange={e => _setCanvasSelector(e.target.value)}
+                  placeholder="canvas (default)"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <button type="submit" style={styles.submitBtn} disabled={isRendering}>
-        {isRendering ? '⏳ Renderizando...' : isDone ? '▶ Iniciar Nuevo Render' : isError ? '▶ Reintentar' : '▶ Iniciar Render'}
+      <button type="submit" style={styles.submitBtn}>
+        ▶ Añadir a cola
       </button>
-
-      {isRendering && (
-        <button type="button" style={{ ...styles.submitBtn, color: 'var(--text)' }} onClick={handleStop}>
-          ⏹ Detener render
-        </button>
-      )}
-
-      {isCancelled && (
-        <button type="button" style={{ ...styles.submitBtn, color: 'var(--text)' }} onClick={handleReset}>
-          ↩ Restablecer
-        </button>
-      )}
     </form>
   );
 }

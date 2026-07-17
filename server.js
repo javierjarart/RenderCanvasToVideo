@@ -5,6 +5,7 @@ const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
 const { PassThrough } = require('stream');
+const multer = require('multer');
 
 function resolveSafe(base, ...paths) {
     const resolved = path.resolve(base, ...paths);
@@ -31,10 +32,12 @@ const app = express();
 app.use(express.json());
 
 app.use((req, res, next) => {
-    res.setHeader(
-        'Content-Security-Policy',
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'"
-    );
+    if (!req.path.startsWith('/proyectos/') && !req.path.startsWith('/external-project/')) {
+        res.setHeader(
+            'Content-Security-Policy',
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'"
+        );
+    }
     next();
 });
 
@@ -134,6 +137,8 @@ app.use('/external-project', (req, res, next) => {
 });
 
 let renderStatus = { state: 'idle', progress: 0, total: 0, fileUrl: null, error: null };
+let currentBrowser = null;
+let renderCancelled = false;
 
 app.get('/api/health', (req, res) => {
     res.json({ ok: true });
@@ -158,13 +163,105 @@ app.get('/api/logs', (req, res) => {
     res.json({ logs: newLogs, total: logBuffer.length });
 });
 
+// ─── Obtener selectores de canvas del proyecto ──────────────────────────────
+app.get('/api/canvas-selectors', (req, res) => {
+    const { project, path: customPath } = req.query;
+    let htmlPath;
+
+    if (customPath) {
+        htmlPath = path.join(customPath, 'index.html');
+    } else if (project) {
+        htmlPath = path.join(APP_ROOT, 'proyectos', project, 'index.html');
+    } else {
+        return res.status(400).json({ error: 'Se requiere project o path' });
+    }
+
+    if (!fs.existsSync(htmlPath)) {
+        return res.json({ selectors: [] });
+    }
+
+    const html = fs.readFileSync(htmlPath, 'utf-8');
+    const selectors = [];
+
+    const canvasRegex = /<canvas[^>]*>/gi;
+    let match;
+    while ((match = canvasRegex.exec(html)) !== null) {
+        const tag = match[0];
+        const idMatch = tag.match(/\bid=["']([^"']+)["']/i);
+        if (idMatch) {
+            selectors.push(`#${idMatch[1]}`);
+        }
+        const classMatch = tag.match(/\bclass=["']([^"']+)["']/i);
+        if (classMatch) {
+            for (const cls of classMatch[1].split(/\s+/)) {
+                if (cls) selectors.push(`.${cls}`);
+            }
+        }
+    }
+
+    const unique = [...new Set(selectors)];
+    res.json({ selectors: unique });
+});
+
+// ─── Upload de carpeta de proyecto ───────────────────────────────────────────
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
+
+app.post('/api/upload-project', (req, res) => {
+    upload.array('files')(req, res, async (err) => {
+        if (err) {
+            log('error', `Error en upload:`, err);
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: 'El archivo excede el límite de 500MB.' });
+            }
+            return res.status(500).json({ error: err.message || 'Error al procesar la subida.' });
+        }
+        const files = req.files;
+        if (!files || files.length === 0) {
+            return res.status(400).json({ error: 'No se recibieron archivos.' });
+        }
+
+    const first = decodeURIComponent(files[0].originalname);
+    const sep = first.includes('/') ? '/' : (first.includes('%2F') ? '%2F' : null);
+    const folderName = sep ? first.split(sep)[0] : `upload-${Date.now()}`;
+    const destDir = path.join(APP_ROOT, 'proyectos', folderName);
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+
+    for (const file of files) {
+        const relative = decodeURIComponent(file.originalname);
+        const parts = relative.split('/');
+        const subpath = parts.length > 1 ? parts.slice(1).join('/') : 'index.html';
+        const filePath = path.join(destDir, subpath);
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(filePath, file.buffer);
+    }
+
+    log('log', `Proyecto subido: ${folderName} → ${destDir}`);
+    res.json({ path: destDir, name: folderName });
+    });
+});
+
 app.post('/api/render', async (req, res) => {
     if (renderStatus.state === 'rendering') {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = req.body;
-    const totalFrames = parseInt(fps) * parseInt(duration);
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace, canvasSelector } = req.body;
+
+    if (!project && !customProjectPath) {
+        return res.status(400).json({ error: 'Debe especificar un proyecto (project o customProjectPath).' });
+    }
+
+    const vWidth = parseInt(width);
+    const vHeight = parseInt(height);
+    const vFps = parseInt(fps);
+    const vDuration = parseInt(duration);
+
+    if (!vWidth || !vHeight || !vFps || !vDuration) {
+        return res.status(400).json({ error: 'Faltan parámetros requeridos (width, height, fps, duration).' });
+    }
+
+    const totalFrames = vFps * vDuration;
 
     const vCodec = codec || 'libx264';
     const vContainer = container || '.mp4';
@@ -189,12 +286,13 @@ app.post('/api/render', async (req, res) => {
     if (!fs.existsSync(rendersDir)) fs.mkdirSync(rendersDir, { recursive: true });
     const outputPath = path.join(rendersDir, fileName);
 
+    renderCancelled = false;
     renderStatus = { state: 'rendering', progress: 0, total: totalFrames, fileUrl: null, error: null };
     res.json({ message: 'Render iniciado' });
 
     log('log', `═══ Render iniciado ═══`);
     log('log', `Proyecto: ${projectName}`);
-    log('log', `Resolución: ${width}x${height}, FPS: ${fps}, Duración: ${duration}s, Total cuadros: ${totalFrames}`);
+    log('log', `Resolución: ${vWidth}x${vHeight}, FPS: ${vFps}, Duración: ${vDuration}s, Total cuadros: ${totalFrames}`);
     const colorProfileStr = [colorPrimaries, colorTrc, colorSpace].filter(Boolean).join('/') || 'none';
     log('log', `Codec: ${vCodec} | PixFmt: ${vPixFmt} | Container: ${vContainer} | CRF: ${crf || 18} | Color: ${colorProfileStr}`);
     log('log', `Color fondo: ${bgColor}`);
@@ -223,21 +321,21 @@ app.post('/api/render', async (req, res) => {
         log('log', `Lanzando Chromium desde: ${chromeExecutablePath}`);
 
         const chromeArgs = [
-            '--disable-dev-shm-usage'
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
         ];
-        if (!chromeExecutablePath || process.env.NODE_ENV === 'development') {
-            chromeArgs.push('--no-sandbox', '--disable-setuid-sandbox');
-        }
         const browser = await puppeteer.launch({
-            headless: true,
-            executablePath: chromeExecutablePath,
+            headless: 'shell',
             args: chromeArgs,
+            env: { ...process.env, LD_LIBRARY_PATH: '/home/flwr/chrome-libs' },
         });
 
         log('log', 'Chromium lanzado correctamente.');
+        currentBrowser = browser;
 
         const page = await browser.newPage();
-        await page.setViewport({ width: parseInt(width), height: parseInt(height) });
+        await page.setViewport({ width: vWidth, height: vHeight });
 
         await page.evaluateOnNewDocument(() => {
             window.__frameTime = 0;
@@ -290,7 +388,7 @@ app.post('/api/render', async (req, res) => {
 
         log('log', 'Buscando <canvas>...');
 
-        const canvasFound = await page.evaluate(() => !!document.querySelector('canvas'));
+        const canvasFound = await page.evaluate((sel) => !!document.querySelector(sel || 'canvas'), canvasSelector);
         if (!canvasFound) {
             const title = await page.evaluate(() => document.title);
             const bodyPreview = await page.evaluate(() => document.body?.innerText?.slice(0, 300) || '(sin contenido)');
@@ -299,11 +397,22 @@ app.post('/api/render', async (req, res) => {
 
         log('log', 'Canvas encontrado.');
 
-        const canvasSize = await page.evaluate(() => {
-            const c = document.querySelector('canvas');
+        const canvasSize = await page.evaluate((sel) => {
+            const c = document.querySelector(sel || 'canvas');
             return { width: c.width, height: c.height };
-        });
+        }, canvasSelector);
         log('log', `Canvas encontrado: ${canvasSize.width}x${canvasSize.height}`);
+
+        const targetW = vWidth;
+        const targetH = vHeight;
+        if (canvasSize.width !== targetW || canvasSize.height !== targetH) {
+            log('log', `Redimensionando canvas de ${canvasSize.width}x${canvasSize.height} a ${targetW}x${targetH}`);
+            await page.evaluate(({ w, h, sel }) => {
+                const c = document.querySelector(sel || 'canvas');
+                c.width = w;
+                c.height = h;
+            }, { w: targetW, h: targetH, sel: canvasSelector });
+        }
 
         const ffmpegPath = resolveFfmpegPath();
         ffmpeg.setFfmpegPath(ffmpegPath);
@@ -312,8 +421,8 @@ app.post('/api/render', async (req, res) => {
         const inputStream = new PassThrough();
 
         const outputOpts = ['-pix_fmt', vPixFmt, '-y'];
-        if (vCodec === 'libx264') {
-            outputOpts.push('-crf', String(crf || 18));
+        if (vCodec === 'libx264' || vCodec === 'libx265') {
+            outputOpts.push('-crf', String(crf || (vCodec === 'libx265' ? 28 : 18)));
         }
         for (const [key, val] of Object.entries(vCodecParams)) {
             if (ALLOWED_CODEC_PARAMS.has(key)) {
@@ -325,7 +434,7 @@ app.post('/api/render', async (req, res) => {
         if (colorSpace) outputOpts.push('-colorspace', colorSpace);
 
         const ffCommand = ffmpeg(inputStream)
-            .inputOptions(['-f', 'image2pipe', '-vcodec', 'png', '-r', String(fps)])
+            .inputOptions(['-f', 'image2pipe', '-vcodec', 'png', '-r', String(vFps)])
             .videoCodec(vCodec)
             .outputOptions(outputOpts)
             .output(outputPath)
@@ -353,7 +462,11 @@ app.post('/api/render', async (req, res) => {
         log('log', 'Iniciando captura de cuadros...');
 
         for (let i = 1; i <= totalFrames; i++) {
-            const timeMs = i * (1000 / fps);
+            if (renderCancelled) {
+                log('log', 'Render cancelado por el usuario.');
+                break;
+            }
+            const timeMs = i * (1000 / vFps);
 
             await page.evaluate((time) => {
                 window.__frameTime = time;
@@ -364,8 +477,8 @@ app.post('/api/render', async (req, res) => {
                 }
             }, timeMs);
 
-            const base64Data = await page.evaluate((bg) => {
-                const targetCanvas = document.querySelector('canvas');
+            const base64Data = await page.evaluate(({ bg, sel }) => {
+                const targetCanvas = document.querySelector(sel || 'canvas');
                 if (!window.__exportCanvas) {
                     window.__exportCanvas = document.createElement('canvas');
                     window.__exportCtx = window.__exportCanvas.getContext('2d');
@@ -378,7 +491,7 @@ app.post('/api/render', async (req, res) => {
                 ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
                 ctx.drawImage(targetCanvas, 0, 0);
                 return tempCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
-            }, bgColor || '#000000');
+            }, { bg: bgColor || '#000000', sel: canvasSelector });
 
             inputStream.write(Buffer.from(base64Data, 'base64'));
             renderStatus.progress = i;
@@ -389,10 +502,37 @@ app.post('/api/render', async (req, res) => {
             }
         }
 
-        log('log', `Captura completada: ${totalFrames} cuadros enviados a FFmpeg.`);
+        if (renderCancelled) {
+            log('log', 'Render cancelado.');
+        } else {
+            log('log', `Captura completada: ${totalFrames} cuadros enviados a FFmpeg.`);
+        }
 
         inputStream.end();
     }
+});
+
+app.post('/api/render/reset', (req, res) => {
+    renderStatus = { state: 'idle', progress: 0, total: 0, fileUrl: null, error: null };
+    renderCancelled = false;
+    currentBrowser = null;
+    log('log', 'Estado del render reseteado.');
+    res.json({ message: 'Estado reseteado' });
+});
+
+app.post('/api/render/cancel', (req, res) => {
+    if (renderStatus.state !== 'rendering') {
+        return res.status(400).json({ error: 'No hay un render en proceso.' });
+    }
+    renderCancelled = true;
+    if (currentBrowser) {
+        currentBrowser.close().catch(() => {});
+        currentBrowser = null;
+    }
+    renderStatus.state = 'cancelled';
+    renderStatus.error = null;
+    log('log', 'Render cancelado por el usuario.');
+    res.json({ message: 'Render cancelado' });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -406,7 +546,7 @@ async function start() {
     } else {
         log('log', `Chromium encontrado en: ${chromeExecutablePath}`);
     }
-    app.listen(PORT, '127.0.0.1', () => {
+    app.listen(PORT, '0.0.0.0', () => {
         log('log', `Servidor listo en http://localhost:${PORT}`);
     });
 }

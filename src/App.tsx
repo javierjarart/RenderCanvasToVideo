@@ -1,6 +1,7 @@
 import RenderForm from './components/RenderForm';
 import ProgressBar from './components/ProgressBar';
 import LogViewer from './components/LogViewer';
+import RenderCapture from './components/RenderCapture';
 import './App.css';
 
 function App() {
@@ -9,6 +10,7 @@ function App() {
       <RenderForm />
       <ProgressBar />
       <LogViewer />
+      <RenderCapture />
       <div className="credit">📷 @javier.jarart</div>
     </div>
   );

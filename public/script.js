@@ -15,12 +15,18 @@ const PRESETS = {
   "cfhd-high-hd":    { name: "CineForm High HD", width: 1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "high" } },
   "cfhd-medium-hd":  { name: "CineForm Medium HD",width:1920, height: 1080, fps: 60, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "medium" } },
   "cfhd-film-4k":    { name: "CineForm Film 4K", width: 3840, height: 2160, fps: 30, codec: "cfhd",   container: ".mov", pixFmt: "yuv422p", codecParams: { quality: "film1" } },
+  "hevc-hd-30":      { name: "HEVC HD 30fps",     width: 1920, height: 1080, fps: 30, codec: "libx265", container: ".mp4", pixFmt: "yuv420p", codecParams: {} },
+  "hevc-hd-60":      { name: "HEVC HD 60fps",     width: 1920, height: 1080, fps: 60, codec: "libx265", container: ".mp4", pixFmt: "yuv420p", codecParams: {} },
+  "hevc-4k-30":      { name: "HEVC 4K 30fps",      width: 3840, height: 2160, fps: 30, codec: "libx265", container: ".mp4", pixFmt: "yuv420p", codecParams: {} },
+  "hevc-4k-60":      { name: "HEVC 4K 60fps",      width: 3840, height: 2160, fps: 60, codec: "libx265", container: ".mp4", pixFmt: "yuv420p", codecParams: {} },
+  "hevc-hdr-hd":     { name: "HEVC HDR HD 30fps",  width: 1920, height: 1080, fps: 30, codec: "libx265", container: ".mp4", pixFmt: "yuv420p10le", codecParams: {} },
 };
 
 const GROUP_LABELS = {
   "hd-30": "-- H.264 MP4 --",
   "hap-q-hd": "-- HAP MOV --",
   "cfhd-film-hd": "-- CineForm MOV --",
+  "hevc-hd-30": "-- HEVC H.265 MP4 --",
 };
 
 const COLOR_PROFILES = {
@@ -29,8 +35,8 @@ const COLOR_PROFILES = {
   "dcip3":  { name: "DCI-P3",   primaries: "smpte432",  trc: "gamma28",   space: "smpte432" },
 };
 
-let customOutputDir = null;
-let customProjectPath = null;
+let uploadedProjectPath = null;
+let uploadedFileName = '';
 
 // ─── Poblar preset dropdown ──────────────────────────────────────────────────
 (function populatePresets() {
@@ -77,54 +83,117 @@ document.getElementById('preset').onchange = function () {
   applyPreset(this.value);
 };
 
-// ─── Manejar selección de carpeta de proyecto externa ────────────────────────
-const btnChooseProjectDir = document.getElementById('btnChooseProjectDir');
+// ─── Subir archivo al servidor ──────────────────────────────────────────────
+async function uploadToServer(files) {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('files', file, file.name);
+  }
+  const display = document.getElementById('selectedProjectDirDisplay');
+  display.innerText = 'Subiendo...';
+  const res = await fetch('/api/upload-project', { method: 'POST', body: formData });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error HTTP ${res.status}`);
+  }
+  return await res.json();
+}
+
+// ─── Cargar selectores de canvas del proyecto ────────────────────────────────
+async function loadCanvasSelectors(projectPath) {
+  const select = document.getElementById('canvasSelector');
+  select.innerHTML = '<option value="">Primer &lt;canvas&gt;</option>';
+  if (!projectPath) return;
+  try {
+    const res = await fetch(`/api/canvas-selectors?path=${encodeURIComponent(projectPath)}`);
+    const data = await res.json();
+    for (const sel of data.selectors) {
+      const opt = document.createElement('option');
+      opt.value = sel;
+      opt.textContent = sel;
+      select.appendChild(opt);
+    }
+  } catch (e) {
+    console.warn('No se pudieron cargar selectores:', e);
+  }
+}
+
+// ─── Botón: Subir archivo ────────────────────────────────────────────────────
+const btnUploadFile = document.getElementById('btnUploadFile');
+const fileInputFile = document.getElementById('fileInputFile');
 const selectedProjectDirDisplay = document.getElementById('selectedProjectDirDisplay');
+const dropZone = document.getElementById('dropZone');
+const dropOverlay = document.getElementById('dropOverlay');
 
-if (btnChooseProjectDir) {
-  btnChooseProjectDir.onclick = async () => {
-    const path = await window.electronAPI.chooseProjectDir();
-    if (path) {
-      customProjectPath = path;
-      selectedProjectDirDisplay.innerText = path;
-      if (!document.getElementById('btnCancelCustomProject')) {
-        const btnCancel = document.createElement('button');
-        btnCancel.id = 'btnCancelCustomProject';
-        btnCancel.innerText = '✕';
-        btnCancel.type = 'button';
-        btnCancel.style.width = '30px';
-        btnCancel.style.padding = '5px';
-        btnCancel.style.marginTop = '0';
-        btnCancel.onclick = () => {
-          customProjectPath = null;
-          selectedProjectDirDisplay.innerText = '';
-          btnCancel.remove();
-        };
-        selectedProjectDirDisplay.parentNode.appendChild(btnCancel);
-      }
+if (btnUploadFile && fileInputFile) {
+  btnUploadFile.onclick = () => fileInputFile.click();
+  fileInputFile.onchange = async () => {
+    const files = fileInputFile.files;
+    if (!files || files.length === 0) return;
+    try {
+      const data = await uploadToServer(files);
+      uploadedProjectPath = data.path;
+      uploadedFileName = files[0].name;
+      selectedProjectDirDisplay.innerText = `📄 ${uploadedFileName}`;
+      selectedProjectDirDisplay.title = data.path;
+      loadCanvasSelectors(data.path);
+    } catch (err) {
+      alert('Error al subir archivo: ' + err.message);
+      selectedProjectDirDisplay.innerText = '';
     }
+    fileInputFile.value = '';
   };
 }
 
-// ─── Carpeta de salida ───────────────────────────────────────────────────────
-const btnChooseDir = document.getElementById('btnChooseDir');
-const selectedDirDisplay = document.getElementById('selectedDirDisplay');
+// ─── Drag & Drop ────────────────────────────────────────────────────────────
+if (dropZone) {
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropZone.addEventListener(evt, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('drag-over');
+    });
+  });
 
-if (btnChooseDir) {
-  btnChooseDir.onclick = async () => {
-    const path = await window.electronAPI.chooseOutputDir();
-    if (path) {
-      customOutputDir = path;
-      selectedDirDisplay.innerText = path;
+  ['dragleave', 'drop'].forEach(evt => {
+    dropZone.addEventListener(evt, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('drag-over');
+    });
+  });
+
+  dropZone.addEventListener('drop', async e => {
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    const htmlFile = Array.from(files).find(f => f.name.endsWith('.html'));
+    if (!htmlFile) {
+      alert('Solo se aceptan archivos .html');
+      return;
     }
-  };
+    try {
+      const data = await uploadToServer([htmlFile]);
+      uploadedProjectPath = data.path;
+      uploadedFileName = htmlFile.name;
+      selectedProjectDirDisplay.innerText = `📄 ${uploadedFileName}`;
+      selectedProjectDirDisplay.title = data.path;
+      loadCanvasSelectors(data.path);
+    } catch (err) {
+      alert('Error al subir archivo: ' + err.message);
+      selectedProjectDirDisplay.innerText = '';
+    }
+  });
 }
 
-// ─── Abrir carpeta ───────────────────────────────────────────────────────────
-const btnOpenFolder = document.getElementById('btnOpenFolder');
-if (btnOpenFolder) {
-  btnOpenFolder.onclick = () => {
-    window.electronAPI.openPath(customOutputDir || 'renders');
+// ─── Botón: Detener render ──────────────────────────────────────────────────
+const btnStopRender = document.getElementById('btnStopRender');
+if (btnStopRender) {
+  btnStopRender.onclick = async () => {
+    try {
+      await fetch('/api/render/cancel', { method: 'POST' });
+    } catch (e) {
+      console.warn('Error al cancelar render:', e);
+    }
   };
 }
 
@@ -137,18 +206,17 @@ document.getElementById('renderForm').onsubmit = async (e) => {
   const progressFill = document.getElementById('progressFill');
   const statusText = document.getElementById('statusText');
   const downloadLink = document.getElementById('downloadLink');
-  const btnOpenFolderElem = document.getElementById('btnOpenFolder');
 
-  if (!customProjectPath) {
-    alert("Selecciona una carpeta de proyecto externa.");
+  if (!uploadedProjectPath) {
+    alert("Sube un archivo HTML primero.");
     return;
   }
 
   btn.disabled = true;
   btn.innerText = "⏳ Renderizando...";
+  btnStopRender.style.display = 'block';
   progressBox.style.display = 'block';
   downloadLink.style.display = 'none';
-  if (btnOpenFolderElem) btnOpenFolderElem.style.display = 'none';
   progressFill.style.width = '0%';
   statusText.innerText = 'Iniciando render...';
 
@@ -167,8 +235,10 @@ document.getElementById('renderForm').onsubmit = async (e) => {
         fps: document.getElementById('fps').value,
         duration: document.getElementById('duration').value,
         bgColor: document.getElementById('bgColor').value,
-        customOutputDir: customOutputDir,
-        customProjectPath: customProjectPath,
+        customOutputDir: null,
+        project: null,
+        customProjectPath: uploadedProjectPath,
+        canvasSelector: document.getElementById('canvasSelector').value || undefined,
         codec: preset.codec || 'libx264',
         container: preset.container || '.mp4',
         pixFmt: preset.pixFmt || 'yuv420p',
@@ -204,18 +274,25 @@ document.getElementById('renderForm').onsubmit = async (e) => {
         progressFill.style.width = `${percent}%`;
       } else if (status.state === 'done') {
         clearInterval(interval);
+        btnStopRender.style.display = 'none';
         statusText.innerText = `¡Render completado exitosamente! 🎉`;
         progressFill.style.width = `100%`;
         downloadLink.href = status.fileUrl;
         downloadLink.style.display = 'block';
-        if (btnOpenFolderElem) btnOpenFolderElem.style.display = 'block';
         btn.disabled = false;
         btn.innerText = "▶ Iniciar Nuevo Render";
       } else if (status.state === 'error') {
         clearInterval(interval);
+        btnStopRender.style.display = 'none';
         statusText.innerText = `❌ Error: ${status.error}`;
         btn.disabled = false;
         btn.innerText = "▶ Reintentar";
+      } else if (status.state === 'cancelled') {
+        clearInterval(interval);
+        btnStopRender.style.display = 'none';
+        statusText.innerText = '⏹ Render detenido';
+        btn.disabled = false;
+        btn.innerText = "▶ Iniciar Nuevo Render";
       }
     } catch (err) {
       clearInterval(interval);

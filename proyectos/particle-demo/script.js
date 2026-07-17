@@ -42,3 +42,5 @@ function draw(time) {
     ctx.font = "16px monospace";
     ctx.fillText(`Particles: ${PARTICLE_COUNT} | Time: ${t.toFixed(1)}s`, 20, 30);
 }
+
+requestAnimationFrame(draw);
