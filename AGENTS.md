@@ -705,6 +705,90 @@ Reescrito para ser amigable al usuario final: menos técnico, más directo, inst
 
 ---
 
+## Refactor render pipeline — ventana oculta + IPC directo (jul 2026)
+
+### Problema
+
+En Windows, al iniciar un render:
+1. Se abría brevemente una ventana (flash) causada por `WebviewWindowBuilder::new()` que creaba una ventana del SO antes de que `.hide()` surtiera efecto
+2. Los frames viajaban por HTTP POST (`/_tauri/send_frame` al ProjectServer), añadiendo latencia y un punto de fallo
+
+### Solución
+
+#### Ventana pre-definida (sin flash)
+
+La ventana `render-capture` se define en `tauri.conf.json` con `visible: false`:
+```json
+{
+  "label": "render-capture",
+  "visible": false,
+  "width": 1,
+  "height": 1,
+  "resizable": false,
+  "decorations": false,
+  "skipTaskbar": true
+}
+```
+
+Tauri la crea al iniciar la app pero el SO nunca la muestra porque nace oculta. En `capture.rs`, en vez de crear una ventana dinámicamente, se obtiene por label con `app.get_webview_window("render-capture")` y se navega a la URL del proyecto con `.navigate()`.
+
+#### IPC directo (sin HTTP)
+
+El script de captura ahora usa `window.__TAURI__.core.invoke('send_frame', {...})` en vez de `fetch('POST /_tauri/send_frame')`. Esto requiere:
+
+1. **`capabilities/default.json`**: Capacidad con `remote` para la ventana `render-capture`:
+```json
+{
+  "identifier": "capture-remote",
+  "windows": ["render-capture"],
+  "remote": { "urls": ["http://127.0.0.1:*"] },
+  "permissions": ["core:default"]
+}
+```
+2. **`server.rs`**: Eliminados los endpoints `handle_send_frame` y `handle_finalize_render` — el servidor solo sirve archivos estáticos del proyecto
+3. **`queue.rs`**: `ProjectServer::start` simplificado (ya no recibe `app`, `job_id` ni `total_frames`)
+
+#### close_capture_webview
+
+Ya no cierra la ventana (vive siempre, oculta), sino que navega a `about:blank` para detener la ejecución del script de captura.
+
+#### FFmpeg multiplataforma
+
+`build.rs` ahora detecta tanto `ffmpeg.exe` como `ffmpeg` en `binaries/` y expone el nombre vía `env!("FFMPEG_BIN_NAME")`. `ffmpeg.rs` usa esa variable para el `include_bytes!`, funcionando correctamente en Windows y Linux.
+
+### Cambios
+
+| Archivo | Cambio |
+|---|---|
+| `src-tauri/tauri.conf.json` | Agregada ventana `render-capture` con `visible: false` + label explícito `"main"` |
+| `src-tauri/capabilities/default.json` | Separada en array con 2 capacidades: `default` (main) y `capture-remote` (render-capture + remote urls) |
+| `src-tauri/src/capture.rs` | Reescribito: usar ventana pre-definida, navegar con `.navigate()`, script usa `invoke('send_frame')`, `close_capture_webview` navega a `about:blank` |
+| `src-tauri/src/server.rs` | Eliminados `handle_send_frame`, `handle_finalize_render`, `url_decode`, `mime_type`; solo sirve archivos |
+| `src-tauri/src/queue.rs` | `ProjectServer::start` ya no recibe `app`/`job_id`/`total_frames`; error handling explícito para `create_capture_webview` |
+| `src-tauri/build.rs` | Detecta `ffmpeg.exe` o `ffmpeg`; expone `FFMPEG_BIN_NAME` |
+| `src-tauri/src/ffmpeg.rs` | `include_bytes!` usa `env!("FFMPEG_BIN_NAME")` |
+| `src-tauri/src/admin_api.rs` | `#[allow(dead_code)]` en campo `jsonrpc` |
+
+### Arquitectura final del pipeline de render
+
+```
+App UI (main window)
+  ↓ invoke('render_project')
+QueueProcessor
+  ├─ ProjectServer::start()      → sirve archivos del proyecto en 127.0.0.1:PORT
+  ├─ FfmpegProcess::spawn()       → ffmpeg -f image2pipe -i - (espera stdin)
+  └─ create_capture_webview()
+       ├─ get_webview_window("render-capture")  → ventana oculta pre-creada
+       ├─ navigate(project_url)                  → carga página del proyecto
+       └─ eval(capture_script)                   → inyecta script de captura
+            ├─ invoke('send_frame', {jobId, data, frame, total})
+            │    └─ lib.rs::send_frame → escribe PNG a FFmpeg stdin
+            └─ invoke('finalize_render', {jobId})
+                 └─ lib.rs::finalize_render → cierra stdin, espera FFmpeg
+```
+
+---
+
 ## Plan de implementación — Bugs del autoejecutable (jul 2026)
 
 ### Problemas identificados y soluciones
