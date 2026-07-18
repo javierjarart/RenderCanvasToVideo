@@ -1,25 +1,12 @@
-[
-  {
-    "identifier": "default",
-    "description": "Default capability set",
-    "windows": ["main"],
-    "permissions": [
-      "core:default",
-      "shell:allow-open",
-      "dialog:default",
-      "dialog:allow-save",
-      "fs:default"
-    ]
-  },
-  {
-    "identifier": "capture-remote",
-    "description": "Allow render-capture webview to call IPC from external project URL",
-    "windows": ["render-capture"],
-    "remote": {
-      "urls": ["http://127.0.0.1:*"]
-    },
-    "permissions": [
-      "core:default"
-    ]
-  }
-]
+{
+  "identifier": "default",
+  "description": "Default capability set",
+  "windows": ["main", "render-capture"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open",
+    "dialog:default",
+    "dialog:allow-save",
+    "fs:default"
+  ]
+}

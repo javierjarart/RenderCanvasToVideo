@@ -120,9 +120,12 @@ impl QueueProcessor {
         let server_shutdown = Arc::new(AtomicBool::new(false));
 
         let project_port = match ProjectServer::start(
+            app.clone(),
             &project_path,
             entry_point.as_deref(),
             server_shutdown.clone(),
+            job_id.clone(),
+            total_frames,
         ) {
             Ok(server) => {
                 let mut s = state.lock().map_err(|e| e.to_string())?;

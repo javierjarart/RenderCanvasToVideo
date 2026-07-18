@@ -67,10 +67,7 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
     const JOB_ID = '{job_id}';
     const FRAME_INTERVAL = 1000 / FPS;
     let currentFrame = 0;
-
-    const invoke = (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
-        ? window.__TAURI__.core.invoke
-        : function() {{ return Promise.reject(new Error('__TAURI__ no disponible')); }};
+    let cancelled = false;
 
     const origDateNow = Date.now;
     const origPerfNow = performance.now.bind(performance);
@@ -80,6 +77,14 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
         window.__rAFCallbacks.push(cb);
         return window.__rAFCallbacks.length;
     }};
+
+    function httpPost(path, data) {{
+        return fetch(path, {{
+            method: 'POST',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify(data),
+        }}).then(function(r) {{ return r.json(); }});
+    }}
 
     function captureFrame() {{
         const sel = CANVAS_SELECTOR || 'canvas';
@@ -142,19 +147,25 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
     }}
 
     function sendFrame(data, frame, total) {{
-        invoke('send_frame', {{ jobId: JOB_ID, data: data, frame: frame, total: total }})
+        httpPost('/_tauri/send_frame', {{ jobId: JOB_ID, data, frame, total }})
+            .then(function(res) {{
+                if (res.error) {{
+                    cancelled = true;
+                    finalize();
+                }}
+            }})
             .catch(function() {{
-                window.__captureCancelled = true;
+                cancelled = true;
                 finalize();
             }});
     }}
 
     function finalize() {{
-        invoke('finalize_render', {{ jobId: JOB_ID }}).catch(function(){{}});
+        httpPost('/_tauri/finalize_render', {{ jobId: JOB_ID }}).catch(function(){{}});
     }}
 
     function nextFrame() {{
-        if (window.__captureCancelled || currentFrame >= TOTAL_FRAMES) {{
+        if (cancelled || currentFrame >= TOTAL_FRAMES) {{
             finalize();
             return;
         }}
@@ -175,7 +186,7 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
 
         setTimeout(function() {{
             if (!captureFrame()) {{
-                window.__captureCancelled = true;
+                cancelled = true;
                 finalize();
                 return;
             }}
@@ -187,7 +198,7 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
         const sel = CANVAS_SELECTOR || 'canvas';
         if (document.querySelector(sel)) {{
             currentFrame = 0;
-            window.__captureCancelled = false;
+            cancelled = false;
             nextFrame();
         }} else {{
             setTimeout(tryStart, 200);
