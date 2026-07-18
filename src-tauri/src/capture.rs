@@ -72,12 +72,18 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
         return 0;
     }};
 
+    function tauriFetch(path, data) {{
+        return fetch(path, {{
+            method: 'POST',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify(data),
+        }}).then(r => r.json());
+    }}
+
     function captureFrame() {{
         const sel = CANVAS_SELECTOR || 'canvas';
         const targetCanvas = document.querySelector(sel);
         if (!targetCanvas) {{
-            sendError('Canvas not found: ' + sel);
-            cancelled = true;
             return false;
         }}
 
@@ -86,15 +92,15 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
         const gpu = targetCanvas.getContext('webgpu');
 
         if (gl) {{
-            const width = targetCanvas.width;
-            const height = targetCanvas.height;
-            const pixels = new Uint8Array(width * height * 4);
-            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            const w = targetCanvas.width;
+            const h = targetCanvas.height;
+            const pixels = new Uint8Array(w * h * 4);
+            gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
             const canvas2 = document.createElement('canvas');
-            canvas2.width = width;
-            canvas2.height = height;
+            canvas2.width = w;
+            canvas2.height = h;
             const ctx2 = canvas2.getContext('2d');
-            const imageData = ctx2.createImageData(width, height);
+            const imageData = ctx2.createImageData(w, h);
             for (let i = 0; i < pixels.length; i += 4) {{
                 imageData.data[i] = pixels[i + 2];
                 imageData.data[i + 1] = pixels[i + 1];
@@ -138,28 +144,21 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
     }}
 
     function sendFrame(data, frame, total) {{
-        try {{
-            window.__TAURI__.core.invoke('send_frame', {{ jobId: JOB_ID, data, frame, total }})
-                .catch(function(err) {{
-                    console.error('send_frame error:', err);
+        tauriFetch('/_tauri/send_frame', {{ jobId: JOB_ID, data, frame, total }})
+            .then(function(res) {{
+                if (res.error) {{
                     cancelled = true;
                     finalize();
-                }});
-        }} catch(e) {{
-            console.error('send_frame exception:', e);
-            cancelled = true;
-            finalize();
-        }}
+                }}
+            }})
+            .catch(function() {{
+                cancelled = true;
+                finalize();
+            }});
     }}
 
     function finalize() {{
-        try {{
-            window.__TAURI__.core.invoke('finalize_render', {{ jobId: JOB_ID }}).catch(function(){{}});
-        }} catch(e) {{}}
-    }}
-
-    function sendError(msg) {{
-        console.error(msg);
+        tauriFetch('/_tauri/finalize_render', {{ jobId: JOB_ID }}).catch(function(){{}});
     }}
 
     function nextFrame() {{
