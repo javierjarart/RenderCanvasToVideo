@@ -78,9 +78,11 @@ jobs:
       - name: Build Tauri app
         run: npx tauri build
 
-      - name: Upload bundle artifact
+      - name: Upload portable binary
         uses: actions/upload-artifact@v4
         with:
-          name: bundle-${{ runner.os }}
-          path: target/release/bundle/
-          if-no-files-found: error
+          name: rendercanvastovideo-${{ runner.os }}
+          path: |
+            target/release/rendercanvastovideo
+            target/release/rendercanvastovideo.exe
+          if-no-files-found: warn
