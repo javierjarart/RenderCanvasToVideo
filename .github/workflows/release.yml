@@ -11,11 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -35,17 +30,14 @@ jobs:
           Remove-Item ffmpeg.zip -Force
           Get-ChildItem -Directory ffmpeg-* | Remove-Item -Recurse -Force
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Build release binary
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml
 
-      - name: Build Tauri app
-        run: npx tauri build
-
-      - name: Upload bundle artifact
+      - name: Upload portable executable
         uses: actions/upload-artifact@v4
         with:
-          name: bundle-Windows
-          path: target/release/bundle/
+          name: rendercanvastovideo-windows
+          path: target/release/rendercanvastovideo.exe
           if-no-files-found: error
 
   create-release:
@@ -55,12 +47,12 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: bundle-Windows
-          path: bundles/
+          name: rendercanvastovideo-windows
+          path: release/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: bundles/**/*
+          files: release/*
           generate_release_notes: true
           fail_on_unmatched_files: false
