@@ -662,16 +662,13 @@ Fuentes de descarga por plataforma:
 ### GitHub Actions
 
 **`.github/workflows/build.yml`** — CI en push a `refactor-vanilla`/`main`:
-- Matrix: `ubuntu-latest`, `windows-latest`, `macos-latest`
-- Node.js v24 con cache npm
-- Dependencias de sistema Linux (webkit2gtk-4.1, etc.)
-- Descarga FFmpeg + `npx tauri build` → sube bundle como artifact
+- Solo Windows
+- Descarga FFmpeg + `npx tauri build --no-bundle` → sube .exe portable como artifact
 
 **`.github/workflows/release.yml`** — Release al pushear tag `v*`:
-- Matrix multiplataforma con `continue-on-error: true`
-- Jobs individuales no bloquean el release si una plataforma falla
-- `create-release` con `if: always()` y `merge-multiple: true` en artifacts
-- Usa `softprops/action-gh-release@v2` para crear GitHub Release
+- Solo Windows
+- `npx tauri build --no-bundle` → sube .exe portable a GitHub Release
+- Usa `softprops/action-gh-release@v2`
 
 ### Release actual
 
@@ -686,8 +683,9 @@ Fuentes de descarga por plataforma:
 
 | Archivo | Cambio |
 |---|---|
-| `src-tauri/tauri.conf.json` | `bundle.active: false` → `true` |
-| `src-tauri/tauri.conf.json` | `removeUnusedCommands: true` |
+| `src-tauri/tauri.conf.json` | `removeUnusedCommands: true` → `false` (Tauri elimina comandos de vanilla JS si no los detecta) |
+| `src-tauri/tauri.conf.json` | `bundle.active: false` (portable sin instalador) |
+| `.github/workflows/build-windows.yml` | `npx tauri build` → `npx tauri build --no-bundle` |
 | `src-tauri/capabilities/default.json` | Eliminado `dialog:allow-open` redundante |
 | `public/app.js` | `openDialog()` simplificado a solo `invoke('plugin:dialog|open', ...)` |
 | `src-tauri/src/capture.rs` | Capture script ya no sobreescribe `Date.now`/`performance.now` globalmente; ahora solo temporalmente durante el callback de animación. Soporta múltiples callbacks RAF en cola. |
