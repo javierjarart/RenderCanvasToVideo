@@ -11,6 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -30,8 +35,11 @@ jobs:
           Remove-Item ffmpeg.zip -Force
           Get-ChildItem -Directory ffmpeg-* | Remove-Item -Recurse -Force
 
-      - name: Build release binary
-        run: cargo build --release --manifest-path src-tauri/Cargo.toml
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Tauri app (portable, sin instalador)
+        run: npx tauri build
 
       - name: Upload portable executable
         uses: actions/upload-artifact@v4
