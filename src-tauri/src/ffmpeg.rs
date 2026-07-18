@@ -6,13 +6,9 @@ use std::sync::OnceLock;
 
 // ── Embedded FFmpeg binary ──────────────────
 
-#[cfg(all(ffmpeg_bundled, target_os = "windows"))]
+#[cfg(ffmpeg_bundled)]
 const FFMPEG_EMBEDDED: &[u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/binaries/ffmpeg.exe"));
-
-#[cfg(all(ffmpeg_bundled, not(target_os = "windows")))]
-const FFMPEG_EMBEDDED: &[u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/binaries/ffmpeg"));
+    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/binaries/", env!("FFMPEG_BIN_NAME")));
 
 fn ffmpeg_bin_name() -> &'static str {
     if cfg!(target_os = "windows") {

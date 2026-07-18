@@ -692,6 +692,8 @@ Fuentes de descarga por plataforma:
 | `src-tauri/src/queue.rs` | `renders/` ahora usa `app.path().app_data_dir()` en vez de `std::env::current_dir()` |
 | `.github/workflows/build.yml` | Eliminados jobs Linux y macOS; solo Windows |
 | `src-tauri/binaries/ffmpeg` | FFmpeg 7.0.2 estático descargado (77MB) |
+| `public/app.js` | `invoke('plugin:dialog|open', options)` → `invoke('plugin:dialog|open', { options })` |
+| `.github/workflows/release.yml` | Añadido `permissions: contents: write` para crear GitHub Release |
 
 ### Binario compilado
 - Con FFmpeg embebido: **91MB** (antes 15MB sin FFmpeg)

@@ -4,12 +4,18 @@ fn main() {
 
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let binaries = std::path::Path::new(&manifest_dir).join("binaries");
-    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    let ffmpeg_name = if target_os == "windows" { "ffmpeg.exe" } else { "ffmpeg" };
-    let ffmpeg_path = binaries.join(ffmpeg_name);
 
-    if ffmpeg_path.exists() {
+    let ffmpeg_bin = if binaries.join("ffmpeg.exe").exists() {
+        "ffmpeg.exe"
+    } else if binaries.join("ffmpeg").exists() {
+        "ffmpeg"
+    } else {
+        ""
+    };
+
+    if !ffmpeg_bin.is_empty() {
         println!("cargo:rustc-cfg=ffmpeg_bundled");
-        println!("cargo:rerun-if-changed={}", ffmpeg_path.display());
+        println!("cargo:rustc-env=FFMPEG_BIN_NAME={}", ffmpeg_bin);
+        println!("cargo:rerun-if-changed={}", binaries.join(ffmpeg_bin).display());
     }
 }

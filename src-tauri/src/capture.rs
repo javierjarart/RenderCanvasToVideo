@@ -1,5 +1,5 @@
 use std::time::Duration;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager};
 
 pub fn create_capture_webview(
     app: &AppHandle,
@@ -14,26 +14,32 @@ pub fn create_capture_webview(
 ) -> Result<String, String> {
     const LABEL: &str = "render-capture";
 
-    let url: url::Url = project_url
+    let window = app
+        .get_webview_window(LABEL)
+        .ok_or_else(|| {
+            format!("Ventana '{}' no encontrada. Define render-capture en tauri.conf.json", LABEL)
+        })?;
+
+    window
+        .set_size(tauri::LogicalSize::new(width as f64, height as f64))
+        .map_err(|e| format!("Error redimensionando webview: {}", e))?;
+
+    window
+        .set_position(tauri::LogicalPosition::new(-9999.0, -9999.0))
+        .map_err(|e| format!("Error posicionando webview: {}", e))?;
+
+    let parsed_url: url::Url = project_url
         .parse()
         .map_err(|e: url::ParseError| format!("URL inválida: {}", e))?;
-
-    let webview = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(url))
-        .inner_size(width as f64, height as f64)
-        .position(-9999.0, -9999.0)
-        .resizable(false)
-        .decorations(false)
-        .skip_taskbar(true)
-        .build()
-        .map_err(|e| format!("Error creando webview oculta: {}", e))?;
-
-    let _ = webview.hide();
+    window
+        .navigate(parsed_url)
+        .map_err(|e| format!("Error navegando a URL del proyecto: {}", e))?;
 
     let script = capture_script(fps, total_frames, bg_color, canvas_selector, job_id);
 
-    let wv = webview.clone();
+    let wv = window.clone();
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(1500)).await;
+        tokio::time::sleep(Duration::from_millis(2000)).await;
         let _ = wv.eval(&script);
     });
 
@@ -42,13 +48,18 @@ pub fn create_capture_webview(
 
 pub fn close_capture_webview(app: &AppHandle) {
     if let Some(wv) = app.get_webview_window("render-capture") {
-        let _ = wv.close();
+        if let Ok(url) = "about:blank".parse::<url::Url>() {
+            let _ = wv.navigate(url);
+        }
     }
 }
 
 fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: &str, job_id: &str) -> String {
     format!(
         r#"(function() {{
+    if (window.__captureRunning) return;
+    window.__captureRunning = true;
+
     const FPS = {fps};
     const TOTAL_FRAMES = {total_frames};
     const BG_COLOR = '{bg_color}';
@@ -56,8 +67,10 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
     const JOB_ID = '{job_id}';
     const FRAME_INTERVAL = 1000 / FPS;
     let currentFrame = 0;
-    let cancelled = false;
-    let running = false;
+
+    const invoke = (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke)
+        ? window.__TAURI__.core.invoke
+        : function() {{ return Promise.reject(new Error('__TAURI__ no disponible')); }};
 
     const origDateNow = Date.now;
     const origPerfNow = performance.now.bind(performance);
@@ -68,20 +81,10 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
         return window.__rAFCallbacks.length;
     }};
 
-    function tauriFetch(path, data) {{
-        return fetch(path, {{
-            method: 'POST',
-            headers: {{ 'Content-Type': 'application/json' }},
-            body: JSON.stringify(data),
-        }}).then(r => r.json());
-    }}
-
     function captureFrame() {{
         const sel = CANVAS_SELECTOR || 'canvas';
         const targetCanvas = document.querySelector(sel);
-        if (!targetCanvas) {{
-            return false;
-        }}
+        if (!targetCanvas) return false;
 
         let base64;
         const gl = targetCanvas.getContext('webgl') || targetCanvas.getContext('webgl2');
@@ -139,25 +142,19 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
     }}
 
     function sendFrame(data, frame, total) {{
-        tauriFetch('/_tauri/send_frame', {{ jobId: JOB_ID, data, frame, total }})
-            .then(function(res) {{
-                if (res.error) {{
-                    cancelled = true;
-                    finalize();
-                }}
-            }})
+        invoke('send_frame', {{ jobId: JOB_ID, data: data, frame: frame, total: total }})
             .catch(function() {{
-                cancelled = true;
+                window.__captureCancelled = true;
                 finalize();
             }});
     }}
 
     function finalize() {{
-        tauriFetch('/_tauri/finalize_render', {{ jobId: JOB_ID }}).catch(function(){{}});
+        invoke('finalize_render', {{ jobId: JOB_ID }}).catch(function(){{}});
     }}
 
     function nextFrame() {{
-        if (cancelled || currentFrame >= TOTAL_FRAMES) {{
+        if (window.__captureCancelled || currentFrame >= TOTAL_FRAMES) {{
             finalize();
             return;
         }}
@@ -178,7 +175,7 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
 
         setTimeout(function() {{
             if (!captureFrame()) {{
-                cancelled = true;
+                window.__captureCancelled = true;
                 finalize();
                 return;
             }}
@@ -187,12 +184,10 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
     }}
 
     function tryStart() {{
-        if (running) return;
         const sel = CANVAS_SELECTOR || 'canvas';
         if (document.querySelector(sel)) {{
-            running = true;
             currentFrame = 0;
-            cancelled = false;
+            window.__captureCancelled = false;
             nextFrame();
         }} else {{
             setTimeout(tryStart, 200);

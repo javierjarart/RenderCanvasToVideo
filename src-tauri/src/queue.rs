@@ -118,7 +118,12 @@ impl QueueProcessor {
         }
 
         let server_shutdown = Arc::new(AtomicBool::new(false));
-        let project_port = match ProjectServer::start(app.clone(), &project_path, entry_point.as_deref(), server_shutdown.clone(), job_id.clone(), total_frames) {
+
+        let project_port = match ProjectServer::start(
+            &project_path,
+            entry_point.as_deref(),
+            server_shutdown.clone(),
+        ) {
             Ok(server) => {
                 let mut s = state.lock().map_err(|e| e.to_string())?;
                 s.add_log("log", format!("Servidor de proyecto iniciado en puerto {}", server.port));
@@ -161,7 +166,7 @@ impl QueueProcessor {
 
         let project_url = format!("http://127.0.0.1:{}", project_port);
 
-        let _ = create_capture_webview(
+        match create_capture_webview(
             app,
             &project_url,
             fps,
@@ -171,7 +176,18 @@ impl QueueProcessor {
             width,
             height,
             &job_id,
-        );
+        ) {
+            Ok(_) => {
+                if let Ok(mut s) = state.lock() {
+                    s.add_log("log", "Webview de captura iniciada correctamente".into());
+                }
+            }
+            Err(e) => {
+                if let Ok(mut s) = state.lock() {
+                    s.add_log("error", format!("Error al crear webview de captura: {}", e));
+                }
+            }
+        }
 
         let _ = app.emit(
             "render-started",

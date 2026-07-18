@@ -848,6 +848,7 @@ fn mcp_create_project(args: &Value) -> ToolResult {
 
 #[derive(Deserialize)]
 struct JsonRpcRequest {
+    #[allow(dead_code)]
     jsonrpc: String,
     #[serde(default)]
     id: Option<Value>,
