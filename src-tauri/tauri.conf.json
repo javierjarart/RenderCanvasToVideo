@@ -1,6 +1,6 @@
 {
   "productName": "RenderCanvasToVideo",
-  "version": "0.3.0",
+  "version": "0.3.7",
   "identifier": "com.javierjarart.rendercanvastovideo",
   "build": {
     "frontendDist": "../public",
