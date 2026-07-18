@@ -59,17 +59,13 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
     let cancelled = false;
     let running = false;
 
-    window.__frameTime = 0;
     const origDateNow = Date.now;
-    Date.now = function() {{ return window.__frameTime; }};
     const origPerfNow = performance.now.bind(performance);
-    performance.now = function() {{ return window.__frameTime; }};
+    window.__rAFCallbacks = [];
 
-    const origRAF = window.requestAnimationFrame;
     window.requestAnimationFrame = function(cb) {{
-        if (window.__rAFCallback) return 0;
-        window.__rAFCallback = cb;
-        return 0;
+        window.__rAFCallbacks.push(cb);
+        return window.__rAFCallbacks.length;
     }};
 
     function tauriFetch(path, data) {{
@@ -111,7 +107,6 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
             base64 = canvas2.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
         }} else if (gpu) {{
             try {{
-                const texture = gpu.getCurrentTexture();
                 const canvas2 = document.createElement('canvas');
                 canvas2.width = targetCanvas.width;
                 canvas2.height = targetCanvas.height;
@@ -167,16 +162,28 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
             return;
         }}
         currentFrame++;
-        window.__frameTime = currentFrame * FRAME_INTERVAL;
-        if (window.__rAFCallback) {{
-            const cb = window.__rAFCallback;
-            window.__rAFCallback = null;
-            try {{ cb(window.__frameTime); }} catch(e) {{}}
+        var simTime = currentFrame * FRAME_INTERVAL;
+
+        Date.now = function() {{ return simTime; }};
+        performance.now = function() {{ return simTime; }};
+
+        var callbacks = window.__rAFCallbacks;
+        window.__rAFCallbacks = [];
+        for (var i = 0; i < callbacks.length; i++) {{
+            try {{ callbacks[i](simTime); }} catch(e) {{}}
         }}
-        origRAF(function() {{
-            captureFrame();
+
+        Date.now = origDateNow;
+        performance.now = origPerfNow;
+
+        setTimeout(function() {{
+            if (!captureFrame()) {{
+                cancelled = true;
+                finalize();
+                return;
+            }}
             setTimeout(nextFrame, 0);
-        }});
+        }}, 0);
     }}
 
     function tryStart() {{

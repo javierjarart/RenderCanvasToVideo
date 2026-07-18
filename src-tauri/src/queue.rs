@@ -78,7 +78,9 @@ impl QueueProcessor {
         let hwaccel = params.hwaccel.clone();
         let entry_point = params.project_entry.clone();
 
-        let renders_dir = std::env::current_dir()
+        let renders_dir = app
+            .path()
+            .app_data_dir()
             .map(|p| p.join("renders").to_string_lossy().to_string())
             .unwrap_or_else(|_| "renders".into());
 

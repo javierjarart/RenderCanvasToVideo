@@ -676,13 +676,58 @@ Fuentes de descarga por plataforma:
 ### Release actual
 
 - Tag: `v0.3.0`
-- Binario release: `target/release/rendercanvastovideo` (15MB sin FFmpeg, ~65MB con FFmpeg embebido)
+- Binario release: `target/release/rendercanvastovideo` (~91MB con FFmpeg embebido)
 - FFmpeg embebido via `include_bytes!` → extraído a `$TMPDIR/RenderCanvasToVideo/ffmpeg`
-- Para hacer release: pushear tag `v*` → GitHub Actions construye y publica
+- Para hacer release: pushear tag `v*` → GitHub Actions construye y publica (solo Windows)
+
+## Implementación completada (jul 2026)
+
+### Cambios realizados
+
+| Archivo | Cambio |
+|---|---|
+| `src-tauri/tauri.conf.json` | `bundle.active: false` → `true` |
+| `src-tauri/tauri.conf.json` | `removeUnusedCommands: true` |
+| `src-tauri/capabilities/default.json` | Eliminado `dialog:allow-open` redundante |
+| `public/app.js` | `openDialog()` simplificado a solo `invoke('plugin:dialog|open', ...)` |
+| `src-tauri/src/capture.rs` | Capture script ya no sobreescribe `Date.now`/`performance.now` globalmente; ahora solo temporalmente durante el callback de animación. Soporta múltiples callbacks RAF en cola. |
+| `src-tauri/src/queue.rs` | `renders/` ahora usa `app.path().app_data_dir()` en vez de `std::env::current_dir()` |
+| `.github/workflows/build.yml` | Eliminados jobs Linux y macOS; solo Windows |
+| `src-tauri/binaries/ffmpeg` | FFmpeg 7.0.2 estático descargado (77MB) |
+
+### Binario compilado
+- Con FFmpeg embebido: **91MB** (antes 15MB sin FFmpeg)
+- Compilación exitosa sin errores (solo 2 warnings menores)
 
 ### README
 
 Reescrito para ser amigable al usuario final: menos técnico, más directo, instrucciones simplificadas, sección de descarga para todas las plataformas.
+
+---
+
+## Plan de implementación — Bugs del autoejecutable (jul 2026)
+
+### Problemas identificados y soluciones
+
+| # | Problema | Archivo | Solución |
+|---|---|---|---|
+| 1 | No se genera instalador | `tauri.conf.json:26` | `bundle.active` → `true` |
+| 2 | FFmpeg no embebido | `binaries/` solo `.gitkeep` | Descargar FFmpeg estático a `binaries/ffmpeg` |
+| 3 | `openDialog()` con rama rota | `public/app.js:142-153` | Simplificar a solo `invoke('plugin:dialog|open', ...)` |
+| 4 | Permiso `dialog:allow-open` redundante | `capabilities/default.json` | Eliminar duplicado |
+| 5 | Capture script sobreescribe globals | `capture.rs` | No mutar `Date.now`/`performance.now`/`requestAnimationFrame` nativos |
+| 6 | `renders/` en CWD inestable | `queue.rs:81-83` | Usar `app_data_dir` en vez de `current_dir()` |
+
+### Orden de implementación
+
+1. **Config**: `tauri.conf.json` (bundle.active, removeUnusedCommands)
+2. **Capabilities**: limpiar permisos
+3. **Frontend**: simplificar `openDialog()`
+4. **FFmpeg**: descargar binario estático y embeber
+5. **Rust queue**: usar `app_data_dir` para renders
+6. **Capture**: reescribir script sin mutar globals nativas
+
+---
 
 ## Notas importantes
 
