@@ -81,7 +81,7 @@ fn capture_script(fps: u32, total_frames: u32, bg_color: &str, canvas_selector: 
     function httpPost(path, data) {{
         return fetch(path, {{
             method: 'POST',
-            headers: {{ 'Content-Type': 'application/json' }},
+            headers: {{ 'Content-Type': 'text/plain' }},
             body: JSON.stringify(data),
         }}).then(function(r) {{ return r.json(); }});
     }}
