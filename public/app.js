@@ -141,7 +141,7 @@ function updateCodecInfo(presetKey) {
 
 async function openDialog(options) {
   try {
-    const selected = await invoke('plugin:dialog|open', options);
+    const selected = await invoke('plugin:dialog|open', { options });
     return selected || null;
   } catch (err) {
     alert('Error al seleccionar: ' + err);
