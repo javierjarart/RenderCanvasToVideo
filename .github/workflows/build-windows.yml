@@ -1,0 +1,48 @@
+name: Build Windows Portable
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: target/
+          key: windows-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Download FFmpeg
+        shell: pwsh
+        run: |
+          mkdir src-tauri/binaries -Force
+          curl -L -o ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+          Expand-Archive ffmpeg.zip -DestinationPath .
+          cp ffmpeg-*/bin/ffmpeg.exe src-tauri/binaries/
+          Remove-Item ffmpeg.zip -Force
+          Get-ChildItem -Directory ffmpeg-* | Remove-Item -Recurse -Force
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        run: npx tauri build
+
+      - name: Upload portable executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendercanvastovideo-windows
+          path: target/release/rendercanvastovideo.exe
+          if-no-files-found: error
