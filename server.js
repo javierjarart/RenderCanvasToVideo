@@ -179,6 +179,10 @@ app.post('/api/render', async (req, res) => {
         if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
             return res.status(400).json({ error: `Ruta de proyecto inválida: ${customProjectPath}` });
         }
+        const indexPath = path.join(resolved, 'index.html');
+        if (!fs.existsSync(indexPath)) {
+            return res.status(400).json({ error: `No se encontró index.html en: ${resolved}` });
+        }
         currentCustomProjectPath = resolved;
         projectName = path.basename(resolved);
     }

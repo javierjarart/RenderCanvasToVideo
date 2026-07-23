@@ -106,6 +106,10 @@ app.post('/api/render', async (req, res) => {
         if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
             return res.status(400).json({ error: `Ruta de proyecto inválida: ${customProjectPath}` });
         }
+        const indexPath = path.join(resolved, 'index.html');
+        if (!fs.existsSync(indexPath)) {
+            return res.status(400).json({ error: `No se encontró index.html en: ${resolved}` });
+        }
         currentCustomProjectPath = resolved;
         projectName = path.basename(resolved);
     }
@@ -354,6 +358,13 @@ async function main() {
                 if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
                     return {
                         content: [{ type: 'text', text: `Invalid project path: ${customProjectPath}` }],
+                        isError: true
+                    };
+                }
+                const indexPath = path.join(resolved, 'index.html');
+                if (!fs.existsSync(indexPath)) {
+                    return {
+                        content: [{ type: 'text', text: `No index.html found in: ${resolved}` }],
                         isError: true
                     };
                 }
