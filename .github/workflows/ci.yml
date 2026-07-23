@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: npm ci
+        shell: pwsh
+
+      - name: Install FFmpeg (with HAP support)
+        run: node scripts/install-ffmpeg.js win64
+        shell: pwsh
+
+      - name: Install Chromium
+        run: node scripts/install-chrome.js win64
+        shell: pwsh
+
+      - name: Run Node tests
+        run: npm run test:node
+        shell: pwsh
+
+      - name: Run Python tests
+        run: npm run test:python
+        shell: pwsh
+
+      - name: Build Windows executable (no installer)
+        run: npm run predist:win && npx electron-builder --win --dir
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Verify executable runs
+        run: |
+          $exe = Get-ChildItem dist/win-unpacked/*.exe | Select-Object -First 1
+          if ($exe) {
+            Write-Host "Found: $($exe.FullName)"
+            & $exe.FullName --version
+          } else {
+            Write-Error "No executable found in dist/win-unpacked/"
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendercanvastovideo-win
+          path: dist/win-unpacked/
+          retention-days: 7
+
+  test-matrix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        node-version: ['20']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:node
+        shell: bash

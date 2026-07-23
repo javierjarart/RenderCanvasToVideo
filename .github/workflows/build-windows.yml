@@ -1,0 +1,160 @@
+name: Build Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.2.4)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '20'
+  ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
+  ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ELECTRON_CACHE }}
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
+
+      - name: Cache electron-builder
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-builder-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-builder-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+        shell: pwsh
+
+      - name: Install Chrome for Windows (win64)
+        run: node scripts/install-chrome.js win64
+        shell: pwsh
+        env:
+          PUPPETEER_CACHE_DIR: ${{ runner.temp }}/puppeteer-cache
+
+      - name: Install FFmpeg with HAP support for Windows
+        run: node scripts/install-ffmpeg.js win64
+        shell: pwsh
+
+      - name: Verify FFmpeg has HAP encoder
+        run: |
+          $ffmpeg = "bin\ffmpeg.exe"
+          if (Test-Path $ffmpeg) {
+            & $ffmpeg -encoders | Select-String hap
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "✓ FFmpeg has HAP encoder"
+            } else {
+              Write-Error "✗ FFmpeg missing HAP encoder"
+              exit 1
+            }
+          } else {
+            Write-Error "FFmpeg not found at $ffmpeg"
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Build Windows executable
+        run: npm run dist:win
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: List build artifacts
+        run: |
+          Get-ChildItem dist -Recurse -File | ForEach-Object {
+            Write-Host "$($_.FullName) - $($_.Length / 1MB) MB"
+          }
+        shell: pwsh
+
+      - name: Create release (on tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RenderCanvasToVideo-Windows
+          path: dist/*.exe
+          retention-days: 30
+
+      - name: Upload FFmpeg binary (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-hap
+          path: bin/ffmpeg.exe
+          retention-days: 7
+
+  # Optional: Cross-platform build from Linux (faster, no Windows runner needed)
+  # build-windows-cross:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 45
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'npm'
+  #
+  #     - name: Install dependencies
+  #       run: npm ci
+  #
+  #     - name: Install Chrome for Windows (cross-compile)
+  #       run: node scripts/install-chrome.js win64
+  #
+  #     - name: Install FFmpeg with HAP for Windows (cross-compile)
+  #       run: node scripts/install-ffmpeg.js win64
+  #
+  #     - name: Build Windows from Linux
+  #       run: npm run dist:win
+  #       env:
+  #         CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+  #         WINE: /usr/bin/wine
+  #
+  #     - name: Upload artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: RenderCanvasToVideo-Windows-cross
+  #         path: dist/*.exe
+  #         retention-days: 30
