@@ -158,13 +158,62 @@ app.get('/api/logs', (req, res) => {
     res.json({ logs: newLogs, total: logBuffer.length });
 });
 
+app.post('/api/detect-canvases', (req, res) => {
+    const { path: filePath } = req.body;
+    if (!filePath) return res.status(400).json({ error: 'Falta el parámetro path' });
+
+    const resolved = path.isAbsolute(filePath)
+        ? path.resolve(filePath)
+        : resolveSafe(APP_ROOT, filePath);
+
+    if (!fs.existsSync(resolved)) {
+        return res.status(400).json({ error: `Ruta no existe: ${resolved}` });
+    }
+
+    let html = '';
+    const stat = fs.statSync(resolved);
+    if (stat.isDirectory()) {
+        const indexPath = path.join(resolved, 'index.html');
+        if (!fs.existsSync(indexPath)) {
+            return res.json({ count: 0, canvases: [] });
+        }
+        html = fs.readFileSync(indexPath, 'utf-8');
+    } else if (stat.isFile() && (resolved.endsWith('.html') || resolved.endsWith('.htm'))) {
+        html = fs.readFileSync(resolved, 'utf-8');
+    } else {
+        return res.status(400).json({ error: 'El archivo debe ser .html o una carpeta con index.html' });
+    }
+
+    const canvasRegex = /<canvas[\s>]/gi;
+    const count = (html.match(canvasRegex) || []).length;
+
+    const canvases = [];
+    if (count > 0) {
+        const idRegex = /<canvas[^>]*\sid=["']([^"']*)["']/gi;
+        let match;
+        let idx = 0;
+        const tempIdRegex = new RegExp(idRegex.source, 'gi');
+        while ((match = tempIdRegex.exec(html)) !== null) {
+            canvases.push({ index: idx, id: match[1] || null });
+            idx++;
+        }
+        while (canvases.length < count) {
+            canvases.push({ index: canvases.length, id: null });
+        }
+    }
+
+    res.json({ count, canvases });
+});
+
 app.post('/api/render', async (req, res) => {
     if (renderStatus.state === 'rendering') {
         return res.status(400).json({ error: 'Ya hay un render en proceso.' });
     }
 
-    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace } = req.body;
-    const totalFrames = parseInt(fps) * parseInt(duration);
+    const { project, width, height, fps, duration, bgColor, customOutputDir, customProjectPath, codec, container, pixFmt, codecParams, crf, colorPrimaries, colorTrc, colorSpace, canvasIndex } = req.body;
+    const vCanvasIndex = parseInt(canvasIndex) || 0;
+    const vFps = parseInt(fps);
+    const totalFrames = vFps * parseInt(duration);
 
     const vCodec = codec || 'libx264';
     const vContainer = container || '.mp4';
@@ -172,19 +221,32 @@ app.post('/api/render', async (req, res) => {
     const vCodecParams = codecParams || {};
 
     let projectName = project;
+    let customProjectFile = null;
     if (customProjectPath) {
         const resolved = path.isAbsolute(customProjectPath)
             ? path.resolve(customProjectPath)
             : resolveSafe(APP_ROOT, customProjectPath);
-        if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
-            return res.status(400).json({ error: `Ruta de proyecto inválida: ${customProjectPath}` });
+        if (!fs.existsSync(resolved)) {
+            return res.status(400).json({ error: `Ruta no existe: ${customProjectPath}` });
         }
-        const indexPath = path.join(resolved, 'index.html');
-        if (!fs.existsSync(indexPath)) {
-            return res.status(400).json({ error: `No se encontró index.html en: ${resolved}` });
+        const stat = fs.statSync(resolved);
+        if (stat.isDirectory()) {
+            const indexPath = path.join(resolved, 'index.html');
+            if (!fs.existsSync(indexPath)) {
+                return res.status(400).json({ error: `No se encontró index.html en: ${resolved}` });
+            }
+            currentCustomProjectPath = resolved;
+            projectName = path.basename(resolved);
+        } else if (stat.isFile()) {
+            if (!resolved.endsWith('.html') && !resolved.endsWith('.htm')) {
+                return res.status(400).json({ error: `El archivo debe ser .html: ${resolved}` });
+            }
+            currentCustomProjectPath = path.dirname(resolved);
+            customProjectFile = path.basename(resolved);
+            projectName = path.basename(resolved, path.extname(resolved));
+        } else {
+            return res.status(400).json({ error: `Ruta inválida: ${customProjectPath}` });
         }
-        currentCustomProjectPath = resolved;
-        projectName = path.basename(resolved);
     }
 
     const fileName = `Render_${projectName}_${Date.now()}${vContainer}`;
@@ -255,7 +317,7 @@ app.post('/api/render', async (req, res) => {
 
         const baseUrl = `http://localhost:${PORT}`;
         const projectUrl = customProjectPath
-            ? `${baseUrl}/external-project/index.html`
+            ? `${baseUrl}/external-project/${customProjectFile || 'index.html'}`
             : `${baseUrl}/proyectos/${project}/index.html`;
 
         log('log', `Cargando página: ${projectUrl}`);
@@ -278,8 +340,9 @@ app.post('/api/render', async (req, res) => {
         }
 
         if (!pageLoaded) {
+            const htmlFile = customProjectFile || 'index.html';
             const htmlPath = customProjectPath
-                ? path.join(customProjectPath, 'index.html')
+                ? path.join(customProjectPath, htmlFile)
                 : path.join(APP_ROOT, 'proyectos', project, 'index.html');
 
             log('log', `Leyendo HTML desde: ${htmlPath}`);
@@ -292,21 +355,25 @@ app.post('/api/render', async (req, res) => {
             await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
         }
 
-        log('log', 'Buscando <canvas>...');
+        log('log', `Buscando <canvas> [índice ${vCanvasIndex}]...`);
 
-        const canvasFound = await page.evaluate(() => !!document.querySelector('canvas'));
+        const canvasFound = await page.evaluate((idx) => !!document.querySelectorAll('canvas')[idx], vCanvasIndex);
         if (!canvasFound) {
+            const total = await page.evaluate(() => document.querySelectorAll('canvas').length);
             const title = await page.evaluate(() => document.title);
             const bodyPreview = await page.evaluate(() => document.body?.innerText?.slice(0, 300) || '(sin contenido)');
-            throw new Error(`No se encontró <canvas> en la página.\nTítulo: ${title}\nBody: ${bodyPreview}`);
+            const msg = total === 0
+                ? `No se encontró <canvas> en la página.\nTítulo: ${title}\nBody: ${bodyPreview}`
+                : `Índice de canvas ${vCanvasIndex} no válido. La página tiene ${total} canvas (0-${total - 1}).`;
+            throw new Error(msg);
         }
 
         log('log', 'Canvas encontrado.');
 
-        const canvasSize = await page.evaluate(() => {
-            const c = document.querySelector('canvas');
+        const canvasSize = await page.evaluate((idx) => {
+            const c = document.querySelectorAll('canvas')[idx];
             return { width: c.width, height: c.height };
-        });
+        }, vCanvasIndex);
         log('log', `Canvas encontrado: ${canvasSize.width}x${canvasSize.height}`);
 
         const ffmpegPath = resolveFfmpegPath();
@@ -368,8 +435,9 @@ app.post('/api/render', async (req, res) => {
                 }
             }, timeMs);
 
-            const base64Data = await page.evaluate((bg) => {
-                const targetCanvas = document.querySelector('canvas');
+            const base64Data = await page.evaluate(({ bg, idx }) => {
+                const targetCanvas = document.querySelectorAll('canvas')[idx];
+                if (!targetCanvas) throw new Error(`Canvas índice ${idx} no encontrado en la página`);
                 if (!window.__exportCanvas) {
                     window.__exportCanvas = document.createElement('canvas');
                     window.__exportCtx = window.__exportCanvas.getContext('2d');
@@ -382,7 +450,7 @@ app.post('/api/render', async (req, res) => {
                 ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
                 ctx.drawImage(targetCanvas, 0, 0);
                 return tempCanvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
-            }, bgColor || '#000000');
+            }, { bg: bgColor || '#000000', idx: vCanvasIndex });
 
             inputStream.write(Buffer.from(base64Data, 'base64'));
             renderStatus.progress = i;

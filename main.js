@@ -74,10 +74,11 @@ ipcMain.handle('choose-output-dir', async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
-ipcMain.handle('choose-project-dir', async () => {
+ipcMain.handle('choose-input-path', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory'],
-    title: 'Elegir carpeta del proyecto a renderizar',
+    properties: ['openFile', 'openDirectory'],
+    title: 'Elegir archivo .html o carpeta del proyecto',
+    filters: [{ name: 'HTML', extensions: ['html', 'htm'] }],
   });
   return result.canceled ? null : result.filePaths[0];
 });

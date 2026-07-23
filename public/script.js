@@ -30,7 +30,8 @@ const COLOR_PROFILES = {
 };
 
 let customOutputDir = null;
-let customProjectPath = null;
+let customInputPath = null;
+let canvasDetection = null;
 
 // ─── Poblar preset dropdown ──────────────────────────────────────────────────
 (function populatePresets() {
@@ -77,33 +78,102 @@ document.getElementById('preset').onchange = function () {
   applyPreset(this.value);
 };
 
-// ─── Manejar selección de carpeta de proyecto externa ────────────────────────
-const btnChooseProjectDir = document.getElementById('btnChooseProjectDir');
-const selectedProjectDirDisplay = document.getElementById('selectedProjectDirDisplay');
+// ─── Manejar selección de carpeta/archivo de entrada ─────────────────────────
+function showInputClearButton() {
+  if (document.getElementById('btnCancelInput')) return;
+  const btn = document.createElement('button');
+  btn.id = 'btnCancelInput';
+  btn.innerText = '✕';
+  btn.type = 'button';
+  btn.style.width = '30px';
+  btn.style.padding = '5px';
+  btn.style.marginTop = '0';
+  btn.onclick = () => {
+    customInputPath = null;
+    document.getElementById('selectedInputDisplay').innerText = '';
+    document.getElementById('canvasRow').style.display = 'none';
+    btn.remove();
+  };
+  document.getElementById('selectedInputDisplay').parentNode.appendChild(btn);
+}
 
-if (btnChooseProjectDir) {
-  btnChooseProjectDir.onclick = async () => {
-    const path = await window.electronAPI.chooseProjectDir();
-    if (path) {
-      customProjectPath = path;
-      selectedProjectDirDisplay.innerText = path;
-      if (!document.getElementById('btnCancelCustomProject')) {
-        const btnCancel = document.createElement('button');
-        btnCancel.id = 'btnCancelCustomProject';
-        btnCancel.innerText = '✕';
-        btnCancel.type = 'button';
-        btnCancel.style.width = '30px';
-        btnCancel.style.padding = '5px';
-        btnCancel.style.marginTop = '0';
-        btnCancel.onclick = () => {
-          customProjectPath = null;
-          selectedProjectDirDisplay.innerText = '';
-          btnCancel.remove();
-        };
-        selectedProjectDirDisplay.parentNode.appendChild(btnCancel);
+async function detectCanvases(filePath) {
+  const canvasSelect = document.getElementById('canvasSelect');
+  const canvasRow = document.getElementById('canvasRow');
+  canvasRow.style.display = 'none';
+  canvasSelect.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/detect-canvases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: filePath })
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (data.count > 0) {
+      for (const c of data.canvases) {
+        const label = c.id ? `Canvas ${c.index} (#${c.id})` : `Canvas ${c.index}`;
+        const opt = document.createElement('option');
+        opt.value = c.index;
+        opt.textContent = label;
+        canvasSelect.appendChild(opt);
       }
+      canvasRow.style.display = 'flex';
+    }
+  } catch (_) {}
+}
+
+const btnChooseInput = document.getElementById('btnChooseInput');
+const selectedInputDisplay = document.getElementById('selectedInputDisplay');
+
+if (btnChooseInput) {
+  btnChooseInput.onclick = async () => {
+    const result = await window.electronAPI.chooseInputPath();
+    if (result) {
+      customInputPath = result;
+      selectedInputDisplay.innerText = result;
+      showInputClearButton();
+      detectCanvases(result);
     }
   };
+}
+
+// ─── Drag & drop ─────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const dropText = document.getElementById('dropText');
+
+if (dropZone) {
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+    dropText.innerText = 'Suelta para seleccionar';
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+    dropText.innerText = 'Suelta un archivo .html o carpeta aquí';
+  });
+
+  dropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    dropText.innerText = 'Suelta un archivo .html o carpeta aquí';
+
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    if (window.electronAPI && window.electronAPI.getDroppedPath) {
+      const path = window.electronAPI.getDroppedPath(file);
+      if (path) {
+        customInputPath = path;
+        selectedInputDisplay.innerText = path;
+        showInputClearButton();
+        detectCanvases(path);
+      }
+    }
+  });
 }
 
 // ─── Carpeta de salida ───────────────────────────────────────────────────────
@@ -139,8 +209,8 @@ document.getElementById('renderForm').onsubmit = async (e) => {
   const downloadLink = document.getElementById('downloadLink');
   const btnOpenFolderElem = document.getElementById('btnOpenFolder');
 
-  if (!customProjectPath) {
-    alert("Selecciona una carpeta de proyecto externa.");
+  if (!customInputPath) {
+    alert("Selecciona una carpeta o archivo .html de entrada.");
     return;
   }
 
@@ -168,7 +238,7 @@ document.getElementById('renderForm').onsubmit = async (e) => {
         duration: document.getElementById('duration').value,
         bgColor: document.getElementById('bgColor').value,
         customOutputDir: customOutputDir,
-        customProjectPath: customProjectPath,
+        customProjectPath: customInputPath,
         codec: preset.codec || 'libx264',
         container: preset.container || '.mp4',
         pixFmt: preset.pixFmt || 'yuv420p',
@@ -176,6 +246,7 @@ document.getElementById('renderForm').onsubmit = async (e) => {
         colorPrimaries: colorProfile.primaries || '',
         colorTrc: colorProfile.trc || '',
         colorSpace: colorProfile.space || '',
+        canvasIndex: parseInt(document.getElementById('canvasSelect').value) || 0,
       })
     });
 

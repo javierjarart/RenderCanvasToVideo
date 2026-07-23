@@ -157,6 +157,27 @@ input[readonly] { color: var(--muted); cursor: default; }
 }
 #downloadLink:hover { background: #3a3a3a; }
 
+/* ─── Drop Zone ──────────────────────────────────────────────────────────── */
+#dropZone {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  margin-top: 1px;
+  text-align: center;
+  font-size: 8px;
+  color: var(--muted);
+  cursor: default;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+  line-height: 18px;
+  min-height: 20px;
+}
+#dropZone.dragover {
+  border-color: var(--accent);
+  background: rgba(255, 72, 0, 0.08);
+  color: var(--accent);
+}
+
 /* ─── Log de ejecución ──────────────────────────────────────────────────── */
 #logContainer {
     margin-top: 3px;

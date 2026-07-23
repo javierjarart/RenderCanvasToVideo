@@ -8,15 +8,18 @@
 <body>
 
     <div class="studio-container">
-        <h1></h1>
         <form id="renderForm">
             <div class="row">
-                <button type="button" id="btnChooseProjectDir" class="flex-1">📁 Carpeta de Entrada</button>
+                <button type="button" id="btnChooseInput" class="flex-1">📁 Carpeta o Archivo</button>
                 <button type="button" id="btnChooseDir" class="flex-1">📁 Carpeta de Salida</button>
             </div>
             <div class="row">
-                <span id="selectedProjectDirDisplay" class="path-display flex-1"></span>
+                <span id="selectedInputDisplay" class="path-display flex-1"></span>
                 <span id="selectedDirDisplay" class="path-display flex-1"></span>
+            </div>
+
+            <div id="dropZone">
+                <span id="dropText">Suelta un archivo .html o carpeta aquí</span>
             </div>
 
             <div class="row">
@@ -60,6 +63,15 @@
                 <div class="form-group flex-1">
                     <label>Códec / Salida</label>
                     <input type="text" id="codecInfo" readonly>
+                </div>
+            </div>
+
+            <div class="row" id="canvasRow" style="display:none">
+                <div class="form-group flex-1">
+                    <label>Canvas</label>
+                    <select id="canvasSelect"></select>
+                </div>
+                <div class="form-group flex-1">
                 </div>
             </div>
 
