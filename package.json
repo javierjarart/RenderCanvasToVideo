@@ -1,6 +1,6 @@
 {
   "name": "rendercanvastovideo",
-  "version": "0.2.4",
+  "version": "0.5.0",
   "description": "RenderCanvasToVideo  — standalone app",
   "main": "main.js",
   "author": "Javier Jara",
