@@ -24,7 +24,7 @@ jobs:
       - run: npm run predist:win
         shell: pwsh
 
-      - run: npx electron-builder --win
+      - run: npx --no electron-builder --win
         shell: pwsh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

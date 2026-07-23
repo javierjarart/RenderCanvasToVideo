@@ -76,10 +76,7 @@
       "category": "public.app-category.video"
     },
     "win": {
-      "target": "nsis",
-      "signtoolOptions": {
-        "publisherName": "Javier Jara"
-      }
+      "target": "nsis"
     },
     "linux": {
       "target": "AppImage"
