@@ -85,6 +85,19 @@ function extractTarXz(src, destDir, innerPath) {
   }
 }
 
+function findFilesRecursive(dir, pattern) {
+  const results = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...findFilesRecursive(fullPath, pattern));
+    } else if (entry.name.includes(pattern)) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
 function extractZip(src, destDir, innerPath) {
   const tmp = path.join(path.dirname(src), 'ffmpeg_extracted');
   if (fs.existsSync(tmp)) fs.rmSync(tmp, { recursive: true });
@@ -106,10 +119,10 @@ function extractZip(src, destDir, innerPath) {
         );
       }
     }
-    // Search for the binary in the extracted files
-    const files = execSync(`find "${tmp}" -type f -name "ffmpeg*"`, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+    const files = findFilesRecursive(tmp, 'ffmpeg');
+    const targetName = innerPath.split('/').pop();
     for (const f of files) {
-      if (f.endsWith(innerPath.split('/').pop()) || f.endsWith('ffmpeg') || f.endsWith('ffmpeg.exe')) {
+      if (f.endsWith(targetName) || f.endsWith('ffmpeg') || f.endsWith('ffmpeg.exe')) {
         return f;
       }
     }
