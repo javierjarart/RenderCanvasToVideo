@@ -1,6 +1,6 @@
 {
   "name": "rendercanvastovideo",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "RenderCanvasToVideo  — standalone app",
   "main": "main.js",
   "author": "Javier Jara",
@@ -77,7 +77,6 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico",
       "signtoolOptions": {
         "publisherName": "Javier Jara"
       }
