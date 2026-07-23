@@ -19,7 +19,7 @@
     "predist:mac": "node scripts/install-chrome.js mac-arm64 && node scripts/install-ffmpeg.js mac-arm64",
     "predist:linux": "node scripts/install-chrome.js linux64 && node scripts/install-ffmpeg.js linux64",
     "dist:mac": "npm run predist:mac && electron-builder --mac",
-    "dist:win": "npm run predist:win && electron-builder --win",
+    "dist:win": "npm run predist:win && electron-builder --win --publish=never",
     "dist:linux": "npm run predist:linux && electron-builder --linux",
     "postinstall": "puppeteer browsers install chrome"
   },
