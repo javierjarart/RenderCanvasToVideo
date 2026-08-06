@@ -29,30 +29,6 @@ Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 
 ---
 
-## Release
-
-Solo se publican releases de **Windows** (instalador NSIS). Para publicar una nueva versión:
-
-1. Actualiza la versión en `package.json`:
-
-   ```bash
-   npm version patch   # o minor / major
-   ```
-
-2. Haz commit y push al branch `main`:
-
-   ```bash
-   git add package.json && git commit -m "bump: vX.Y.Z"
-   git push origin main
-   ```
-
-3. En GitHub Actions, dispara el workflow **Release** con el input `version` exacto (ej. `v0.6.0`).
-
-   > El workflow valida que la versión del tag coincida con `package.json`. Si no coinciden, falla en el primer paso.
-
-4. El workflow compila el instalador, ejecuta un **smoke test** del binario empaquetado (arranca la app, renderiza un proyecto de prueba y valida el video generado) y, solo si pasa, crea el tag y publica la release `v0.6.0`.
-
----
 
 ## Interfaces
 
