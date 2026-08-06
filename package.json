@@ -16,11 +16,7 @@
     "install:ffmpeg": "node scripts/install-ffmpeg.js",
     "predist": "node scripts/install-chrome.js && node scripts/install-ffmpeg.js",
     "predist:win": "node scripts/install-chrome.js win64 && node scripts/install-ffmpeg.js win64",
-    "predist:mac": "node scripts/install-chrome.js mac-arm64 && node scripts/install-ffmpeg.js mac-arm64",
-    "predist:linux": "node scripts/install-chrome.js linux64 && node scripts/install-ffmpeg.js linux64",
-    "dist:mac": "npm run predist:mac && electron-builder --mac",
     "dist:win": "npm run predist:win && electron-builder --win --publish=never",
-    "dist:linux": "npm run predist:linux && electron-builder --linux",
     "postinstall": "puppeteer browsers install chrome"
   },
   "bin": {
@@ -71,15 +67,8 @@
         "to": "../.cache/puppeteer"
       }
     ],
-    "mac": {
-      "target": "dmg",
-      "category": "public.app-category.video"
-    },
     "win": {
       "target": "nsis"
-    },
-    "linux": {
-      "target": "AppImage"
     },
     "nsis": {
       "oneClick": false,
