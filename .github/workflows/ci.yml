@@ -43,7 +43,7 @@ jobs:
         shell: pwsh
 
       - name: Run Python tests
-        run: pip install -e . && python -m unittest discover tests -v
+        run: python -m unittest discover tests -v
         shell: pwsh
 
       - name: Build Windows executable (unpacked)
