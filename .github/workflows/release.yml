@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -60,24 +60,131 @@ jobs:
         run: node scripts/install-ffmpeg.js win64
         shell: pwsh
 
-      - name: Build Windows executable
+      - name: Build Windows installer
         run: npm run dist:win
         shell: pwsh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: Verify build
+      - name: Build unpacked binary for smoke test
+        run: npx electron-builder --win --dir
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist/*.exe
+
+      - name: Upload unpacked binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-unpacked
+          path: dist/win-unpacked/
+
+  smoke-test:
+    runs-on: windows-latest
+    needs: build
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download unpacked binary
+        uses: actions/download-artifact@v4
+        with:
+          name: win-unpacked
+          path: dist/win-unpacked
+
+      - name: Set up Chromium and FFmpeg binaries for test project
+        run: |
+          node scripts/install-chrome.js win64
+          node scripts/install-ffmpeg.js win64
+        shell: pwsh
+
+      - name: Smoke test - launch app and render a test video
         shell: pwsh
         run: |
-          $exe = Get-ChildItem dist/*.exe | Select-Object -First 1
-          if ($exe) {
-            Write-Host "Built: $($exe.Name) - $($exe.Length / 1MB) MB"
-            & $exe.FullName --version 2>$null | Out-Null
-            Write-Host "Executable runs successfully"
-          } else {
-            Write-Error "No .exe found in dist/"
+          $ErrorActionPreference = 'Stop'
+          $exe = "dist\win-unpacked\RenderCanvasToVideo.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "Binario no encontrado: $exe"
             exit 1
           }
+          Write-Host "Lanzando app empaquetada: $exe"
+          $proc = Start-Process -FilePath $exe -PassThru
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              Start-Sleep -Seconds 1
+              try {
+                $health = Invoke-RestMethod -Uri "http://localhost:3000/api/health" -TimeoutSec 2
+                if ($health.ok) { $healthy = $true; break }
+              } catch { }
+            }
+            if (-not $healthy) {
+              Write-Error "El servidor no respondio en /api/health tras 60s"
+              exit 1
+            }
+            Write-Host "Servidor Express OK"
+
+            $body = @{
+              project    = 'test-anim'
+              width      = 320
+              height     = 240
+              fps        = 15
+              duration   = 1
+              bgColor    = '#000000'
+              codec      = 'libx264'
+              container  = '.mp4'
+              pixFmt     = 'yuv420p'
+            } | ConvertTo-Json
+
+            Invoke-RestMethod -Uri "http://localhost:3000/api/render" -Method Post -ContentType "application/json" -Body $body | Out-Null
+            Write-Host "Render iniciado"
+
+            $done = $false
+            for ($i = 0; $i -lt 120; $i++) {
+              Start-Sleep -Seconds 1
+              $status = Invoke-RestMethod -Uri "http://localhost:3000/api/status"
+              if ($status.state -eq 'done') { $done = $true; break }
+              if ($status.state -eq 'error') {
+                Write-Error "Render fallo: $($status.error)"
+                exit 1
+              }
+            }
+            if (-not $done) {
+              Write-Error "Render no termino en 120s (state: $($status.state))"
+              exit 1
+            }
+            Write-Host "Render completado"
+
+            $mp4 = Get-ChildItem renders/*.mp4 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if (-not $mp4 -or $mp4.Length -eq 0) {
+              Write-Error "No se genero ningun .mp4 valido en renders/"
+              exit 1
+            }
+            Write-Host "Video generado: $($mp4.Name) - $($mp4.Length) bytes"
+          } finally {
+            if ($proc -and -not $proc.HasExited) {
+              Stop-Process -Id $proc.Id -Force
+            }
+          }
+
+  release:
+    runs-on: windows-latest
+    needs: [build, smoke-test]
+    timeout-minutes: 20
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: installer
+          path: dist
 
       - name: Create Git tag
         shell: pwsh
