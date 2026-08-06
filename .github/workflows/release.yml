@@ -163,9 +163,9 @@ jobs:
             }
             Write-Host "Render completado"
 
-            $mp4 = Get-ChildItem renders/*.mp4 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            $mp4 = Get-ChildItem dist/win-unpacked/renders/*.mp4 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if (-not $mp4 -or $mp4.Length -eq 0) {
-              Write-Error "No se genero ningun .mp4 valido en renders/"
+              Write-Error "No se genero ningun .mp4 valido en dist/win-unpacked/renders/"
               exit 1
             }
             Write-Host "Video generado: $($mp4.Name) - $($mp4.Length) bytes"
