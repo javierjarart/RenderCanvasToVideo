@@ -24,3 +24,6 @@ MIGRATE_DEPS.md
 
 # VS Code extension
 vscode-extension/
+
+# Documentación técnica local
+rendercanvastovideo-technical-doc.md
