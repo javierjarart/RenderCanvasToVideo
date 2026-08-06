@@ -36,11 +36,13 @@ jobs:
             Write-Error "package.json version ($pkgVersion) no coincide con el tag solicitado ($requested). Haz el bump primero."
             exit 1
           }
-          if (git rev-parse -q --verify "refs/tags/$requested") {
+          git rev-parse -q --verify "refs/tags/$requested" 2>$null
+          if ($LASTEXITCODE -eq 0) {
             Write-Error "El tag $requested ya existe en el repositorio."
             exit 1
           }
           Write-Host "Version validada: $requested"
+          exit 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
