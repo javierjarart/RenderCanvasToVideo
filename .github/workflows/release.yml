@@ -24,18 +24,23 @@ jobs:
       - name: Validate version matches package.json
         shell: pwsh
         run: |
-          $tagVersion = "${{ github.event.inputs.version }}" -replace '^[vV]', ''
+          $requested = "${{ github.event.inputs.version }}"
+          if ($requested -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            Write-Error "Formato de version invalido: $requested. Usa SemVer con prefijo v, ej. v0.6.0."
+            exit 1
+          }
+          $tagVersion = $requested -replace '^v', ''
           $pkg = Get-Content package.json | ConvertFrom-Json
           $pkgVersion = $pkg.version
           if ($pkgVersion -ne $tagVersion) {
-            Write-Error "package.json version ($pkgVersion) no coincide con el tag solicitado (${{ github.event.inputs.version }}). Haz el bump primero."
+            Write-Error "package.json version ($pkgVersion) no coincide con el tag solicitado ($requested). Haz el bump primero."
             exit 1
           }
-          if (git rev-parse -q --verify "refs/tags/v$tagVersion") {
-            Write-Error "El tag v$tagVersion ya existe en el repositorio."
+          if (git rev-parse -q --verify "refs/tags/$requested") {
+            Write-Error "El tag $requested ya existe en el repositorio."
             exit 1
           }
-          Write-Host "Version validada: v$pkgVersion"
+          Write-Host "Version validada: $requested"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
