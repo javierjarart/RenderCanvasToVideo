@@ -1,8 +1,8 @@
 # RenderCanvasToVideo
-[![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
-Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
+Convierte animaciones HTML5 Canvas a video MP4/MOV (H.264, HAP, CineForm). Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
 
 <img width="907" height="464" alt="cap" src="https://github.com/user-attachments/assets/f20f7156-8d8a-4b51-baff-19458b160ce6" />
 
@@ -31,7 +31,7 @@ Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 
 ## Release
 
-Para publicar una nueva versión:
+Solo se publican releases de **Windows** (instalador NSIS). Para publicar una nueva versión:
 
 1. Actualiza la versión en `package.json`:
 
@@ -50,7 +50,7 @@ Para publicar una nueva versión:
 
    > El workflow valida que la versión del tag coincida con `package.json`. Si no coinciden, falla en el primer paso.
 
-4. El workflow crea el tag, compila el instalador Windows y publica la release `v0.6.0`.
+4. El workflow compila el instalador, ejecuta un **smoke test** del binario empaquetado (arranca la app, renderiza un proyecto de prueba y valida el video generado) y, solo si pasa, crea el tag y publica la release `v0.6.0`.
 
 ---
 
@@ -58,16 +58,21 @@ Para publicar una nueva versión:
 
 ### 1. Aplicación de escritorio (Electron)
 
+Soporta Windows (instalador NSIS). Para desarrollo:
+
 ```bash
-npm install
-npm start
+npm install   # instala dependencias + Chromium (postinstall)
+npm start     # arranca Electron + servidor Express (localhost:3000)
 ```
+
+El render usa Chromium (Puppeteer) y FFmpeg (`ffmpeg-static`). En el paquete de release, Chrome y FFmpeg se empaquetan con el instalador.
 
 ### 2. CLI Python (`renderCanvasCLI`)
 
+Requiere Python 3.11+. Se ejecuta directamente desde la raíz del repo (no requiere instalación):
+
 ```bash
-pip install -e .
-python -m renderCanvasCLI --help
+python3 -m renderCanvasCLI --help
 ```
 
 | Comando | Descripción |
@@ -142,26 +147,29 @@ Los perfiles de color se seleccionan desde la UI de escritorio o se envían como
 
 ```bash
 # Ver proyectos disponibles
-python -m renderCanvasCLI projects
+python3 -m renderCanvasCLI projects
 
 # Crear un proyecto desde plantilla
-python -m renderCanvasCLI init mi-animacion
+python3 -m renderCanvasCLI init mi-animacion
 
 # Renderizar con preset por defecto (HD 60fps)
-python -m renderCanvasCLI render --project mi-animacion
+python3 -m renderCanvasCLI render -p mi-animacion
 
 # Renderizar con preset específico
-python -m renderCanvasCLI render --project mi-animacion --preset 4k-60
+python3 -m renderCanvasCLI render -p mi-animacion --preset 4k-60
 
 # Renderizar con codec profesional
-python -m renderCanvasCLI render --project mi-animacion --preset hap-q-hd
-python -m renderCanvasCLI render --project mi-animacion --preset cfhd-film-4k
+python3 -m renderCanvasCLI render -p mi-animacion --preset hap-q-hd
+python3 -m renderCanvasCLI render -p mi-animacion --preset cfhd-film-4k
 
-# Renderizar con perfil de color
-python -m renderCanvasCLI render --project mi-animacion --preset hd-60 --color-primaries bt2020 --color-trc bt2020-10 --color-space bt2020nc
+# Renderizar un proyecto externo desde otra carpeta
+python3 -m renderCanvasCLI render -d /ruta/al/proyecto
 
 # Sobrescribir parámetros individuales
-python -m renderCanvasCLI render --project mi-animacion --codec cfhd --pix-fmt yuv422p --container .mov
+python3 -m renderCanvasCLI render -p mi-animacion --codec cfhd --pix-fmt yuv422p --container .mov
+
+# Ver la lista completa de presets
+python3 -m renderCanvasCLI presets
 ```
 
 ---
@@ -179,14 +187,15 @@ python -m renderCanvasCLI render --project mi-animacion --codec cfhd --pix-fmt y
 │   ├── project.py          # Scaffolding y listado de proyectos
 │   ├── progress.py         # Barra de progreso
 │   └── templates/          # Plantillas de proyectos
-├── bin/                    # FFmpeg + entry point CLI
 ├── server.js               # Servidor Express + Puppeteer
 ├── mcp-server.js           # Servidor MCP
 ├── main.js / preload.js    # Electron
-├── public/                 # UI de escritorio
+├── public/                 # UI de escritorio (index.html, script.js, style.css)
+├── scripts/                # Instalación de Chromium y FFmpeg
 ├── proyectos/              # Animaciones fuente
-├── renders/                # Videos generados
-└── docs/mcp-server.md      # Documentación MCP
+├── tests/                  # Tests Node y Python
+├── docs/                   # Documentación (incluye mcp-server.md)
+└── bin/, renders/          # Se generan en tiempo de build/ejecución (ignorados)
 ```
 
 ---
