@@ -29,8 +29,6 @@ Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 
 ---
 
----
-
 ## Release
 
 Para publicar una nueva versión:
