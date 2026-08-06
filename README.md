@@ -1,5 +1,5 @@
 # RenderCanvasToVideo
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 Convierte animaciones HTML5 Canvas a video MP4/MOV. Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
@@ -26,6 +26,33 @@ Los métodos tradicionales de grabación de browser tienen limitaciones severas:
 
 ** Descarga Para Windows:**  
 [RenderCanvasToVideo Setup (última versión)](https://github.com/javierjarart/RenderCanvasToVideo/releases/latest)
+
+---
+
+---
+
+## Release
+
+Para publicar una nueva versión:
+
+1. Actualiza la versión en `package.json`:
+
+   ```bash
+   npm version patch   # o minor / major
+   ```
+
+2. Haz commit y push al branch `main`:
+
+   ```bash
+   git add package.json && git commit -m "bump: vX.Y.Z"
+   git push origin main
+   ```
+
+3. En GitHub Actions, dispara el workflow **Release** con el input `version` exacto (ej. `v0.6.0`).
+
+   > El workflow valida que la versión del tag coincida con `package.json`. Si no coinciden, falla en el primer paso.
+
+4. El workflow crea el tag, compila el instalador Windows y publica la release `v0.6.0`.
 
 ---
 
