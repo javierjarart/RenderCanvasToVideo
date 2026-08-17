@@ -1,5 +1,5 @@
 # RenderCanvasToVideo
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.7.1-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 Convierte animaciones HTML5 Canvas a video MP4/MOV (H.264, HAP, CineForm). Captura frame por frame con Puppeteer + Chromium y los encadena con FFmpeg.
@@ -41,7 +41,7 @@ npm install   # instala dependencias + Chromium (postinstall)
 npm start     # arranca Electron + servidor Express (localhost:3000)
 ```
 
-El render usa Chromium (Puppeteer) y FFmpeg (`ffmpeg-static`). En el paquete de release, Chrome y FFmpeg se empaquetan con el instalador.
+El render usa Chromium (Puppeteer) y FFmpeg (build con soporte HAP, empaquetado en `bin/ffmpeg.exe`). En el paquete de release, Chrome y FFmpeg se empaquetan con el instalador.
 
 ### 2. CLI Python (`renderCanvasCLI`)
 
