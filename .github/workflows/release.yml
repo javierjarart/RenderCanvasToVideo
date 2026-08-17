@@ -54,14 +54,6 @@ jobs:
         run: npm ci
         shell: pwsh
 
-      - name: Install Chrome for Windows
-        run: node scripts/install-chrome.js win64
-        shell: pwsh
-
-      - name: Install FFmpeg with HAP for Windows
-        run: node scripts/install-ffmpeg.js win64
-        shell: pwsh
-
       - name: Build Windows installer
         run: npm run dist:win
         shell: pwsh
@@ -101,12 +93,6 @@ jobs:
         with:
           name: win-unpacked
           path: dist/win-unpacked
-
-      - name: Set up Chromium and FFmpeg binaries for test project
-        run: |
-          node scripts/install-chrome.js win64
-          node scripts/install-ffmpeg.js win64
-        shell: pwsh
 
       - name: Smoke test - launch app and render a test video
         shell: pwsh

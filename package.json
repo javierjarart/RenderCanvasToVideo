@@ -1,6 +1,6 @@
 {
   "name": "rendercanvastovideo",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "RenderCanvasToVideo  — standalone app",
   "main": "main.js",
   "author": "Javier Jara",
@@ -13,6 +13,7 @@
     "test:node": "node --test tests/*.test.js",
     "test:python": "python3 -m unittest discover tests -v",
     "test:all": "npm run test:node && npm run test:python",
+    "generate:icon": "node scripts/generate-icon.js",
     "install:ffmpeg": "node scripts/install-ffmpeg.js",
     "predist": "node scripts/install-chrome.js && node scripts/install-ffmpeg.js",
     "predist:win": "node scripts/install-chrome.js win64 && node scripts/install-ffmpeg.js win64",
@@ -23,31 +24,29 @@
     "rendercanvastovideo-mcp": "mcp-server.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "express": "^5.2.1",
-    "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.3",
     "puppeteer": "^24.43.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "electron": "^35.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "ffmpeg-static": "^5.2.0"
   },
   "build": {
     "appId": "com.javierjarart.rendercanvastovideo",
     "productName": "RenderCanvasToVideo",
+    "copyright": "Copyright © 2026 Javier Jara",
     "directories": {
       "output": "dist"
     },
+    "compression": "maximum",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "files": [
       "main.js",
       "preload.js",
-      "server.js",
-      ".puppeteerrc.cjs",
-      "public/**/*",
-      "proyectos/**/*",
-      "node_modules/**/*",
-      "!node_modules/electron-builder/**/*"
+      "server.js"
     ],
     "extraResources": [
       {
@@ -68,12 +67,17 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "include": "build/installer.nsh"
+      "include": "build/installer.nsh",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "shortcutName": "RenderCanvasToVideo"
     }
   }
 }

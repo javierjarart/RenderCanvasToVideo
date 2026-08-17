@@ -3,7 +3,8 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
+let ffmpegPath = null;
+try { ffmpegPath = require('ffmpeg-static'); } catch { ffmpegPath = null; }
 const { PassThrough } = require('stream');
 
 function resolveSafe(base, ...paths) {
